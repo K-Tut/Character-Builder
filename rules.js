@@ -532,3 +532,93 @@ const TOOLS = ["Alchemist's Supplies", "Brewer's Supplies", "Calligrapher's Supp
 const LANGUAGES = ["Common", "Common Sign Language", "Draconic", "Dwarvish", "Elvish", "Giant", "Gnomish", "Goblin", "Halfling", "Orc", "Abyssal", "Celestial", "Deep Speech", "Druidic", "Infernal", "Primordial", "Sylvan", "Thieves' Cant", "Undercommon"];
 
 const MC_PREREQ_NOTE = "Multiclassing requires 13+ in the primary ability of both your current classes and the new class.";
+
+// ---------- STARTING EQUIPMENT (2024) ----------
+// Each option: list of "count× item" strings; "N GP" becomes coins. Weapons/armor/shield are recognised automatically.
+const START_EQUIP = {
+  class: {
+    barbarian: { A: ["Greataxe", "4 Handaxe", "Explorer's Pack", "15 GP"], B: ["75 GP"] },
+    bard: { A: ["Leather Armor", "2 Dagger", "Musical Instrument (of your choice)", "Entertainer's Pack", "19 GP"], B: ["90 GP"] },
+    cleric: { A: ["Chain Shirt", "Shield", "Mace", "Holy Symbol", "Priest's Pack", "7 GP"], B: ["110 GP"] },
+    druid: { A: ["Leather Armor", "Shield", "Sickle", "Druidic Focus (Quarterstaff)", "Explorer's Pack", "Herbalism Kit", "9 GP"], B: ["50 GP"] },
+    fighter: { A: ["Chain Mail", "Greatsword", "Flail", "8 Javelin", "Dungeoneer's Pack", "4 GP"], B: ["Studded Leather Armor", "Scimitar", "Shortsword", "Longbow", "20 Arrows", "Quiver", "Dungeoneer's Pack", "11 GP"], C: ["155 GP"] },
+    monk: { A: ["Spear", "5 Dagger", "Artisan's Tools or Musical Instrument", "Explorer's Pack", "11 GP"], B: ["50 GP"] },
+    paladin: { A: ["Chain Mail", "Shield", "Longsword", "6 Javelin", "Holy Symbol", "Priest's Pack", "9 GP"], B: ["150 GP"] },
+    ranger: { A: ["Studded Leather Armor", "Scimitar", "Shortsword", "Longbow", "20 Arrows", "Quiver", "Druidic Focus (sprig of mistletoe)", "Explorer's Pack", "7 GP"], B: ["150 GP"] },
+    rogue: { A: ["Leather Armor", "2 Dagger", "Shortsword", "Shortbow", "20 Arrows", "Quiver", "Thieves' Tools", "Burglar's Pack", "8 GP"], B: ["100 GP"] },
+    sorcerer: { A: ["Spear", "2 Dagger", "Arcane Focus (crystal)", "Dungeoneer's Pack", "28 GP"], B: ["50 GP"] },
+    warlock: { A: ["Leather Armor", "Sickle", "2 Dagger", "Arcane Focus (orb)", "Book (occult lore)", "Scholar's Pack", "15 GP"], B: ["100 GP"] },
+    wizard: { A: ["2 Dagger", "Arcane Focus (Quarterstaff)", "Robe", "Spellbook", "Scholar's Pack", "5 GP"], B: ["55 GP"] }
+  },
+  background: {
+    acolyte: ["Calligrapher's Supplies", "Book (prayers)", "Holy Symbol", "10 Parchment sheets", "Robe", "8 GP"],
+    artisan: ["Artisan's Tools (same as above)", "2 Pouch", "Traveler's Clothes", "32 GP"],
+    charlatan: ["Forgery Kit", "Costume", "Fine Clothes", "15 GP"],
+    criminal: ["2 Dagger", "Thieves' Tools", "Crowbar", "2 Pouch", "Traveler's Clothes", "16 GP"],
+    entertainer: ["Musical Instrument (same as above)", "2 Costume", "Mirror", "Perfume", "Traveler's Clothes", "11 GP"],
+    farmer: ["Sickle", "Carpenter's Tools", "Healer's Kit", "Iron Pot", "Shovel", "Traveler's Clothes", "30 GP"],
+    guard: ["Spear", "Light Crossbow", "20 Bolts", "Gaming Set (same as above)", "Hooded Lantern", "Manacles", "Quiver", "Traveler's Clothes", "12 GP"],
+    guide: ["Shortbow", "20 Arrows", "Cartographer's Tools", "Bedroll", "Quiver", "Tent", "Traveler's Clothes", "3 GP"],
+    hermit: ["Quarterstaff", "Herbalism Kit", "Bedroll", "Book (philosophy)", "Lamp", "3 Oil flasks", "Traveler's Clothes", "16 GP"],
+    merchant: ["Navigator's Tools", "2 Pouch", "Traveler's Clothes", "22 GP"],
+    noble: ["Gaming Set (same as above)", "Fine Clothes", "Perfume", "29 GP"],
+    sage: ["Quarterstaff", "Calligrapher's Supplies", "Book (history)", "8 Parchment sheets", "Robe", "8 GP"],
+    sailor: ["Dagger", "Navigator's Tools", "Rope", "Traveler's Clothes", "20 GP"],
+    scribe: ["Calligrapher's Supplies", "Fine Clothes", "Lamp", "3 Oil flasks", "12 Parchment sheets", "23 GP"],
+    soldier: ["Spear", "Shortbow", "20 Arrows", "Gaming Set (same as above)", "Healer's Kit", "Quiver", "Traveler's Clothes", "14 GP"],
+    wayfarer: ["2 Dagger", "Thieves' Tools", "Gaming Set (of your choice)", "Bedroll", "2 Pouch", "Traveler's Clothes", "16 GP"]
+  },
+  backgroundGold: 50
+};
+const ABILITY_ORDER = ["str", "dex", "con", "int", "wis", "cha"];
+const SKILLS_BY_ABILITY = ALL_SKILLS.slice().sort((a, b) => ABILITY_ORDER.indexOf(SKILLS[a]) - ABILITY_ORDER.indexOf(SKILLS[b]) || a.localeCompare(b));
+
+// ---------- ARTIFICER (Eberron: Forge of the Artificer, 2024 rules; Reanimator from Ravenloft: The Horrors Within) ----------
+CLASSES.artificer = {
+  name: "Artificer", hd: 8, primary: ["int"], saves: ["con", "int"],
+  skills: { n: 2, from: ["Arcana", "History", "Investigation", "Medicine", "Nature", "Perception", "Sleight of Hand"] },
+  armor: ["Light armor", "Medium armor", "Shields"], wprof: ["simple"], tools: ["Thieves' Tools", "Tinker's Tools", "One kind of Artisan's Tools"],
+  mc: { skills: 0, armor: ["Light armor", "Medium armor", "Shields"], wprof: [], tools: ["Thieves' Tools", "Tinker's Tools"] },
+  caster: { type: "half", ability: "int", cantrips: step({ 1: 2, 10: 3, 14: 4 }), prepared: PREP.half },
+  features: {
+    1: ["Spellcasting", "Tinker's Magic"], 2: ["Replicate Magic Item"], 3: ["@sub"], 4: ["@asi"], 5: ["@sub"], 6: ["Magic Item Tinker"], 7: ["Flash of Genius"],
+    8: ["@asi"], 9: ["@sub"], 10: ["Magic Item Adept"], 11: ["Spell-Storing Item"], 12: ["@asi"], 14: ["Advanced Artifice"], 15: ["@sub"], 16: ["@asi"],
+    18: ["Magic Item Master"], 19: ["@boon"], 20: ["Soul of Artifice"]
+  },
+  notes: {
+    "Replicate Magic Item": l => `${step({ 2: 4, 6: 5, 10: 6, 14: 7, 18: 8 })[l - 1]} plans known · ${step({ 2: 2, 6: 3, 10: 4, 14: 5, 18: 6 })[l - 1]} items at once`,
+    "Magic Item Adept": () => "attune to 4 items", "Advanced Artifice": () => "attune to 5 items", "Magic Item Master": () => "attune to 6 items"
+  },
+  resources: [
+    { key: "tinker", name: "Tinker's Magic", feature: "Tinker's Magic", reset: "LR", n: (l, D) => Math.max(1, D.mod.int) },
+    { key: "flash", name: "Flash of Genius", feature: "Flash of Genius", reset: "LR", n: (l, D) => l >= 7 ? Math.max(1, D.mod.int) : 0, note: "" },
+    { key: "spellstore", name: "Spell-Storing Item", feature: "Spell-Storing Item", reset: "LR", n: (l, D) => l >= 11 ? Math.max(2, 2 * D.mod.int) : 0 }
+  ],
+  subclasses: {
+    alchemist: { name: "Alchemist", features: { 3: ["Tools of the Trade", "Alchemist Spells", "Experimental Elixir"], 5: ["Alchemical Savant"], 9: ["Restorative Reagents"], 15: ["Chemical Mastery"] },
+      spells: { 3: ["Healing Word", "Ray of Sickness"], 5: ["Flaming Sphere", "Melf's Acid Arrow"], 9: ["Gaseous Form", "Mass Healing Word"], 13: ["Death Ward", "Vitriolic Sphere"], 17: ["Cloudkill", "Raise Dead"] },
+      tools: ["Alchemist's Supplies"],
+      resources: [{ key: "elixir", name: "Experimental Elixir (free)", feature: "Experimental Elixir", reset: "LR", n: step({ 3: 1, 6: 2, 15: 3 }) },
+        { key: "reagents", name: "Restorative Reagents", feature: "Restorative Reagents", reset: "LR", n: (l, D) => l >= 9 ? Math.max(1, D.mod.int) : 0 }] },
+    armorer: { name: "Armorer", features: { 3: ["Tools of the Trade", "Armorer Spells", "Arcane Armor", "Armor Model"], 5: ["Extra Attack"], 9: ["Improved Armorer"], 15: ["Perfected Armor"] },
+      spells: { 3: ["Magic Missile", "Thunderwave"], 5: ["Mirror Image", "Shatter"], 9: ["Hypnotic Pattern", "Lightning Bolt"], 13: ["Fire Shield", "Greater Invisibility"], 17: ["Passwall", "Wall of Force"] },
+      armor: ["Heavy armor"], tools: ["Smith's Tools"], pools: { armorModel: step({ 3: 1 }) } },
+    artillerist: { name: "Artillerist", features: { 3: ["Tools of the Trade", "Artillerist Spells", "Eldritch Cannon"], 5: ["Arcane Firearm"], 9: ["Explosive Cannon"], 15: ["Fortified Position"] },
+      spells: { 3: ["Shield", "Thunderwave"], 5: ["Scorching Ray", "Shatter"], 9: ["Fireball", "Wind Wall"], 13: ["Ice Storm", "Wall of Fire"], 17: ["Cone of Cold", "Wall of Force"] },
+      wprof: ["martialRanged"], tools: ["Woodcarver's Tools"],
+      resources: [{ key: "cannon", name: "Eldritch Cannon (free)", feature: "Eldritch Cannon", reset: "LR", n: step({ 3: 1 }) }] },
+    battlesmith: { name: "Battle Smith", features: { 3: ["Tools of the Trade", "Battle Smith Spells", "Battle Ready", "Steel Defender"], 5: ["Extra Attack"], 9: ["Arcane Jolt"], 15: ["Improved Defender"] },
+      spells: { 3: ["Heroism", "Shield"], 5: ["Shining Smite", "Warding Bond"], 9: ["Aura of Vitality", "Conjure Barrage"], 13: ["Aura of Purity", "Fire Shield"], 17: ["Banishing Smite", "Mass Cure Wounds"] },
+      wprof: ["martial"], tools: ["Smith's Tools"], battleReady: true,
+      resources: [{ key: "jolt", name: "Arcane Jolt", feature: "Arcane Jolt", reset: "LR", n: (l, D) => l >= 9 ? Math.max(1, D.mod.int) : 0, die: l => (l >= 15 ? 4 : 2) + "d6" }] },
+    cartographer: { name: "Cartographer", features: { 3: ["Tools of the Trade", "Cartographer Spells", "Adventurer's Atlas", "Mapping Magic"], 5: ["Guided Precision"], 9: ["Ingenious Movement"], 15: ["Superior Atlas"] },
+      spells: { 3: ["Faerie Fire", "Guiding Bolt", "Healing Word"], 5: ["Locate Object", "Mind Spike"], 9: ["Call Lightning", "Clairvoyance"], 13: ["Banishment", "Locate Creature"], 17: ["Scrying", "Teleportation Circle"] },
+      tools: ["Calligrapher's Supplies", "Cartographer's Tools"] },
+    reanimator: { name: "Reanimator", features: { 3: ["Reanimator Spells", "Reanimator's Skillset", "Reanimated Companion"], 5: ["Strange Modifications"], 9: ["Improved Reanimation", "Macabre Modifications"], 15: ["Refined Reanimation"] },
+      spells: { 3: ["False Life", "Spare the Dying", "Witch Bolt"], 5: ["Blindness/Deafness", "Enhance Ability"], 9: ["Animate Dead", "Lightning Bolt"], 13: ["Blight", "Death Ward"], 17: ["Antilife Shell", "Raise Dead"] },
+      tools: ["Alchemist's Supplies"],
+      resources: [{ key: "raisedead", name: "Raise Dead (Refined Reanimation)", feature: "Refined Reanimation", reset: "LR", n: step({ 15: 1 }) }] }
+  }
+};
+POOLS.armorModel = { label: "Arcane Armor model", options: () => ["Dreadnaught", "Guardian", "Infiltrator"] };
+START_EQUIP.class.artificer = { A: ["Studded Leather Armor", "Dagger", "Thieves' Tools", "Tinker's Tools", "Dungeoneer's Pack", "16 GP"], B: ["150 GP"] };

@@ -84,6 +84,7 @@ function render() {
   else if (S.view === "print") m.innerHTML = renderPrint();
   window.scrollTo(0, y);
   renderModal();
+  if (typeof Dice !== "undefined") Dice.sync();
 }
 
 // ---------- HOME ----------
@@ -116,7 +117,10 @@ function renderHome() {
     ${S.server ? (imp.running ? `<div class="progress"><div style="width:${imp.total ? Math.round(100 * imp.done / imp.total) : 3}%"></div></div><p class="small muted">${esc(imp.msg)} (${imp.done}/${imp.total})</p>` :
       `<div class="row"><button data-act="runImport">${np ? "Update" : "Import"} from dnd2024.wikidot.com</button>${np ? `<button class="ghost" data-act="runImport" data-refresh="1">Re-download everything</button>` : ""}</div>`)
       : `<p class="small muted">Downloading from the wiki needs the Python program on your laptop (run.py). On the phone, the rules text arrives through Drive sync — or load a <code>wiki.json</code> file:</p>`}
-    <div class="row" style="margin-top:6px"><button class="ghost small" data-act="loadWikiFile">Load wiki.json file…</button></div>
+    ${S.ui.wikiEnc && S.ui.wikiEncState === "locked" ? `<div class="lvl" style="margin:8px 0"><b>${np ? "Newer rules text available" : "Rules text available"}</b> <span class="small muted">(password protected${S.ui.wikiEnc.imported ? ", from " + esc(S.ui.wikiEnc.imported) : ""})</span>
+      <div class="row" style="margin-top:6px"><input id="wikiPw" type="password" placeholder="Password" autocomplete="current-password"><label class="small"><input type="checkbox" id="wikiPwRem" checked> remember on this device</label><button data-act="wikiUnlock">Unlock</button></div></div>` : ""}
+    <div class="row" style="margin-top:6px"><button class="ghost small" data-act="loadWikiFile">Load wiki.json file…</button>
+      ${np ? `<button class="ghost small" data-act="wikiEncExport" title="Encrypted copy of the rules text to upload to your GitHub repo">🔒 Create wiki.enc for GitHub…</button>` : ""}</div>
     ${imp.error ? `<p class="warn">${esc(imp.error)}</p>` : ""}
   </div>`;
 }
@@ -180,9 +184,18 @@ function bSpecies(c, D) {
   return h;
 }
 
+function featLabel(n) { const fd = FEATS[n] || {}; return n + (fd.abil ? `  (+1 ${fd.abil.length === 6 ? "any" : fd.abil.map(a => ABBR[a]).join("/")})` : ""); }
 function featSelect(path, f, cats, attr = "") {
-  const opts = Object.entries(FEATS).filter(([n, fd]) => cats.includes(fd.cat)).map(([n]) => n);
-  return `<select data-act="setFeat" data-p="${path}" ${attr}><option value="">— choose feat —</option>${opts.map(n => `<option ${f?.name === n ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>`;
+  const flt = S.ui.featFilter || "";
+  const canFilter = cats.some(x => x === "general" || x === "boon");
+  const ok = ([n, fd]) => cats.includes(fd.cat) && (!canFilter || !flt || f?.name === n || (fd.abil || []).includes(flt) || (fd.asi && flt));
+  const groups = [["origin", "Origin feats"], ["general", "General feats"], ["style", "Fighting style feats"], ["boon", "Epic boons"]];
+  const list = Object.entries(FEATS).filter(ok);
+  const sel = `<select data-act="setFeat" data-p="${path}" ${attr}><option value="">— choose feat —</option>${groups.filter(g => cats.includes(g[0])).map(([g, l]) => {
+    const o = list.filter(([n, fd]) => fd.cat === g); return o.length ? `<optgroup label="${l}">${o.map(([n]) => `<option value="${esc(n)}" ${f?.name === n ? "selected" : ""}>${esc(featLabel(n))}</option>`).join("")}</optgroup>` : "";
+  }).join("")}</select>`;
+  const filter = canFilter ? `<select data-act="featFilter" title="Show only feats that raise this ability"><option value="">All feats</option>${ABILITIES.map(a => `<option value="${a}" ${flt === a ? "selected" : ""}>Raises ${ABILITY_NAMES[a]}</option>`).join("")}</select> ` : "";
+  return filter + sel;
 }
 function pickOpts(spec, D) {
   if (Array.isArray(spec)) return spec;
@@ -196,7 +209,7 @@ function featPicks(path, f, D) {
   const fd = FEATS[f.name] || {}; let h = `<div class="row" style="margin-top:6px">`;
   if (fd.abil) h += `<label>+1 to ${sel(path + ".abil", f.abil, fd.abil.map(a => [a, ABILITY_NAMES[a]]), { blank: "— ability —" })}</label>`;
   for (const p of fd.picks || []) {
-    if (path === "bgFeat" && p.key === "list") continue;
+    if (path === "bgFeat" && p.key === "list" && f.presetList) continue;
     const opts = pickOpts(p.opts, D);
     if (p.count > 1) {
       const cur = f.picks?.[p.key] || [];
@@ -215,33 +228,51 @@ function poolOptions(pk, D) {
   return [...set];
 }
 function poolLabel(pk) { return pk.startsWith("skills:") ? CLASSES[pk.slice(7)].name + " skill proficiencies" : POOLS[pk]?.label || pk; }
+const POOLS_WITH_INFO = new Set(["armorModel", "invocations", "metamagic", "maneuvers", "fightingStyle", "divineOrder", "primalOrder", "mastery"]);
 function poolPicker(pk, D, c, oldMax) {
   const p = D.pools[pk]; if (!p) return "";
   const cur = (c.pools[pk] || []);
   const opts = poolOptions(pk, D);
   const taken = pk.startsWith("skills:") || pk === "skillful" || pk === "keenSenses" || pk === "skillsLore" || pk === "primalKnowledge" ? new Set(D.profSkills.filter(s => !cur.includes(s))) : new Set();
-  return `<div style="margin:10px 0"><b>${esc(poolLabel(pk))}</b> <span class="chip ${cur.length < p.max ? "acc" : ""}">${Math.min(cur.length, p.max)} / ${p.max}${oldMax !== undefined && p.max > oldMax ? ` (+${p.max - oldMax} new)` : ""}</span>
-  <div class="checks">${opts.map(o => `<label class="${taken.has(o) ? "muted" : ""}"><input type="checkbox" data-act="pool" data-k="${esc(pk)}" data-v="${esc(o)}" ${cur.includes(o) ? "checked" : ""} ${!cur.includes(o) && (cur.length >= p.max || taken.has(o)) ? "disabled" : ""}>${esc(o)}${taken.has(o) ? " ✓" : ""}</label>`).join("")}</div></div>`;
+  const info = POOLS_WITH_INFO.has(pk);
+  const open = S.ui.optInfo && S.ui.optInfo.pk === pk ? S.ui.optInfo.o : null;
+  return `<div style="margin:10px 0"><b>${esc(poolLabel(pk))}</b> <span class="chip ${cur.length < p.max ? "acc" : ""}">${Math.min(cur.length, p.max)} / ${p.max}${oldMax !== undefined && p.max > oldMax ? ` (+${p.max - oldMax} new)` : ""}</span>${info ? ' <span class="small muted">tap ⓘ to read</span>' : ""}
+  <div class="checks">${opts.map(o => `<label class="${taken.has(o) ? "muted" : ""}"><input type="checkbox" data-act="pool" data-k="${esc(pk)}" data-v="${esc(o)}" ${cur.includes(o) ? "checked" : ""} ${!cur.includes(o) && (cur.length >= p.max || taken.has(o)) ? "disabled" : ""}>${esc(o)}${taken.has(o) ? " ✓" : ""}${info ? ` <a href="#" class="info ${open === o ? "on" : ""}" data-act="optInfo" data-k="${esc(pk)}" data-v="${esc(o)}">ⓘ</a>` : ""}</label>`).join("")}</div>
+  ${open ? `<div class="infobox"><div class="row"><b>${esc(open)}</b><a href="#" class="right" data-act="optInfo" data-k="${esc(pk)}" data-v="">✕</a></div><div class="desc">${para(optionText(pk, open)) || '<span class="muted">No description found in the imported rules text.</span>'}</div></div>` : ""}</div>`;
 }
 
 function bBackground(c, D) {
-  const bg = BACKGROUNDS[c.background.id];
-  let h = `<div class="card"><h3>Choose a background</h3><div class="grid gauto">${Object.entries(BACKGROUNDS).map(([k, b]) => `
-    <div class="pick ${c.background.id === k ? "on" : ""}" data-act="setBg" data-id="${k}"><b>${b.name}</b>
-    <span class="small muted">${b.abil.map(a => ABBR[a]).join(", ")} · ${b.feat}</span><div class="small">${b.skills.join(", ")} · ${b.tool}</div></div>`).join("")}</div></div>`;
+  const b = c.background; const bg = bgData(c);
+  const flt = S.ui.bgFilter || "";
+  const list = Object.entries(BACKGROUNDS).filter(([k, x]) => !flt || x.abil.includes(flt));
+  let h = `<div class="card"><h3>Choose a background</h3>
+    <div class="row small" style="margin-bottom:8px"><span class="muted">Raises:</span>${["", ...ABILITIES].map(a => `<span class="chip ${flt === a ? "acc" : ""}" style="cursor:pointer" data-act="bgFilter" data-a="${a}">${a ? ABILITY_NAMES[a] : "Any"}</span>`).join("")}</div>
+    <div class="grid gauto">${list.map(([k, x]) => `
+    <div class="pick ${b.id === k ? "on" : ""}" data-act="setBg" data-id="${k}"><b>${x.name}</b>
+    <span class="small muted">${x.abil.map(a => a === flt ? `<span style="color:var(--accent);font-weight:800">${ABBR[a]}</span>` : ABBR[a]).join(", ")} · ${x.feat}</span><div class="small">${x.skills.join(", ")} · ${x.tool}</div></div>`).join("")}
+    <div class="pick ${b.id === "custom" ? "on" : ""}" data-act="setBg" data-id="custom"><b>✎ Custom background</b><span class="small muted">Any abilities · any origin feat</span><div class="small">2 skills · 1 tool of your choice</div></div></div></div>`;
   if (!bg) return h;
-  const b = c.background; const ab = bg.abil.map(a => [a, ABILITY_NAMES[a]]);
+  const ab = bg.abil.map(a => [a, ABILITY_NAMES[a]]);
+  const origins = Object.entries(FEATS).filter(([n, f]) => f.cat === "origin").map(([n]) => n);
   const featName = bg.feat.replace(/\s*\(.*\)$/, "");
-  h += `<div class="card"><h3>${bg.name}</h3>
-   <p><b>Ability scores</b> (choose among ${bg.abil.map(a => ABILITY_NAMES[a]).join(", ")}):</p>
-   <div class="row"><label><input type="radio" name="bgm" data-act="bgMode" value="21" ${b.mode !== "111" ? "checked" : ""}> +2 / +1</label>
-   <label><input type="radio" name="bgm" data-act="bgMode" value="111" ${b.mode === "111" ? "checked" : ""}> +1 / +1 / +1</label></div>
-   ${b.mode !== "111" ? `<div class="row" style="margin-top:6px"><label>+2 ${sel("background.plus2", b.plus2, ab, { blank: "—" })}</label><label>+1 ${sel("background.plus1", b.plus1, ab.filter(x => x[0] !== b.plus2), { blank: "—" })}</label></div>` : ""}
-   <p><b>Skills:</b> ${bg.skills.join(", ")}</p>
-   <p><b>Tool:</b> ${bg.tool.startsWith("One") ? inp("background.tool", b.tool, { ph: bg.tool }) : bg.tool}</p>
-   <p><b>Origin feat:</b> ${bg.feat}</p>${featPicks("bgFeat", { name: featName, ...c.bgFeat }, D)}
-   <details style="margin-top:8px"><summary>Feat description</summary><div class="desc">${para(pageText(findPage("feat", featName)) || lookup(featName)) || '<span class="muted">Not imported.</span>'}</div></details>
-   <details><summary>Background description</summary><div class="desc">${para(pageText(findPage("background", bg.name))) || '<span class="muted">Not imported.</span>'}</div></details>
+  const presetList = !bg.custom && !bg.featChanged && /\(/.test(bg.feat);
+  const p111 = b.p111 || [];
+  h += `<div class="card"><h3>${esc(bg.name)}</h3>
+   ${bg.custom ? `<p><label>Name ${inp("background.customName", b.customName || "", { ph: "e.g. Shipwright", style: "width:240px" })}</label></p>` : ""}
+   <p><b>Ability scores</b> ${bg.custom ? "(any)" : `(choose among ${bg.abil.map(a => ABILITY_NAMES[a]).join(", ")})`}:</p>
+   <div class="row"><label><input type="radio" name="bgm" data-act="bgMode" value="21" ${b.mode !== "111" ? "checked" : ""}> +2 to one, +1 to another</label>
+   <label><input type="radio" name="bgm" data-act="bgMode" value="111" ${b.mode === "111" ? "checked" : ""}> +1 to three</label></div>
+   ${b.mode !== "111" ? `<div class="row" style="margin-top:6px"><label>+2 ${sel("background.plus2", b.plus2, ab, { blank: "—" })}</label><label>+1 ${sel("background.plus1", b.plus1, ab.filter(x => x[0] !== b.plus2), { blank: "—" })}</label></div>`
+      : bg.custom ? `<div class="row" style="margin-top:6px">${[0, 1, 2].map(i => `<label>+1 ${sel("background.p111." + i, p111[i], ab.filter(x => !p111.some((v, j) => j !== i && v === x[0])), { blank: "—" })}</label>`).join("")}</div>`
+      : `<p class="small">+1 to ${bg.abil.map(a => ABILITY_NAMES[a]).join(", ")}</p>`}
+   <p><b>Skills:</b> ${bg.custom ? `<span class="chip ${bg.skills.length < 2 ? "acc" : ""}">${bg.skills.length}/2</span>` : bg.skills.join(", ")}</p>
+   ${bg.custom ? `<div class="checks">${ALL_SKILLS.map(s => `<label><input type="checkbox" data-act="bgSkill" data-v="${s}" ${bg.skills.includes(s) ? "checked" : ""} ${!bg.skills.includes(s) && bg.skills.length >= 2 ? "disabled" : ""}>${s}</label>`).join("")}</div>` : ""}
+   <p><b>Tool proficiency:</b> ${bg.custom ? sel("background.tool", b.tool, TOOLS, { blank: "— choose a tool —" }) : BACKGROUNDS[b.id].tool.startsWith("One") ? inp("background.tool", b.tool, { ph: BACKGROUNDS[b.id].tool }) : bg.tool}</p>
+   <p><b>Origin feat:</b> ${bg.custom ? "" : `${esc(bg.origFeat)} <label class="small" style="margin-left:10px"><input type="checkbox" data-act="bgFeatSwap" ${bg.featChanged ? "checked" : ""}> choose a different origin feat</label>`}</p>
+   ${bg.custom || bg.featChanged ? `<p><select data-act="setBgFeat"><option value="">— choose origin feat —</option>${origins.map(n => `<option ${b.featOverride === n ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></p>` : ""}
+   ${featName ? featPicks("bgFeat", { name: featName, ...c.bgFeat, presetList }, D) : ""}
+   ${featName ? `<details style="margin-top:8px"><summary>Feat description</summary><div class="desc">${para(pageText(findPage("feat", featName)) || lookup(featName)) || '<span class="muted">Not imported.</span>'}</div></details>` : ""}
+   ${bg.custom ? "" : `<details><summary>Background description</summary><div class="desc">${para(pageText(findPage("background", bg.name))) || '<span class="muted">Not imported.</span>'}</div></details>`}
   </div>`;
   return h;
 }
@@ -313,6 +344,7 @@ function bSpells(c, D) {
   h += `<p><b>Chosen:</b> ${mine.map(s => `<span class="chip acc">${esc(s.name)} <a href="#" data-act="spellDel" data-n="${esc(s.name)}" data-c="${cur}">✕</a></span>`).join("") || '<span class="muted">none</span>'}</p>`;
   h += `<div class="row"><input id="spq" placeholder="Search spells…" value="${esc(S.ui.spq || "")}" data-act-input="spq" style="flex:1">
     ${cur === "other" ? "" : `<label class="small"><input type="checkbox" data-act="spAll" ${S.ui.spAll ? "checked" : ""}> show all lists</label>`}</div>
+    ${cs && !S.idx.spellList.some(s => s.classes.includes(cs.list)) && S.idx.spellList.length ? `<p class="small warn">The imported rules text has no ${esc(cs.name)} spell list, so all spells up to level ${cs.maxLvl} are shown — pick the ones on your class list.</p>` : ""}
     <div id="splist">${spellList(c, D, cur, cs)}</div>
     <div class="row" style="margin-top:10px"><span class="small muted">Not in the list?</span><input id="spman" placeholder="Spell name"><select id="spmanl">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(l => `<option value="${l}">${l ? "Level " + l : "Cantrip"}</option>`).join("")}</select><button class="small" data-act="spellAddMan" data-c="${cur}">Add</button></div></div>`;
   return h;
@@ -321,7 +353,8 @@ function spellList(c, D, cur, cs) {
   const q = norm(S.ui.spq || "");
   let list = S.idx.spellList;
   if (!list.length) return `<p class="muted">No spell data imported — import the wiki on the home screen, or add spells by name below.</p>`;
-  if (cs && !S.ui.spAll) list = list.filter(s => s.classes.includes(cs.list) && s.level <= cs.maxLvl);
+  const hasList = cs && S.idx.spellList.some(s => s.classes.includes(cs.list));
+  if (cs && !S.ui.spAll) list = list.filter(s => (!hasList || s.classes.includes(cs.list)) && s.level <= cs.maxLvl);
   if (q) list = list.filter(s => norm(s.name).includes(q));
   const chosen = new Set(c.spells.filter(s => s.cls === cur).map(s => s.name));
   const groups = {}; list.slice(0, 400).forEach(s => (groups[s.level] ||= []).push(s));
@@ -334,10 +367,11 @@ function spellList(c, D, cur, cs) {
 // ---------- equipment ----------
 function bEquipment(c, D) {
   return `<div class="grid g2"><div class="card"><h3>Armor</h3>
-    <div class="row"><label>Armor ${sel("armor", c.armor, Object.entries(ARMOR).map(([k, a]) => [k, a.name + (a.base && k ? ` (AC ${a.base}${a.kind === "light" ? " + Dex" : a.kind === "medium" ? " + Dex max 2" : ""})` : "")]))}</label>
-    <label><input type="checkbox" ${bindA("shield")} ${c.shield ? "checked" : ""}> Shield (+2)</label>
+    <div class="row"><label>Armor ${armorSelect(c, D)}</label>
+    <label><input type="checkbox" ${bindA("shield")} ${c.shield ? "checked" : ""}> Shield (+2)${D.armorTraining.includes("Shields") ? "" : ' <span class="warn small">untrained</span>'}</label>
     <label>Other AC bonus ${inp("acBonus", +c.acBonus || 0, { type: "number" })}</label></div>
-    <p>AC: <span class="big">${D.ac}</span> <span class="muted small">Training: ${D.armorTraining.join(", ") || "none"}</span></p>
+    <p>AC: <span class="big">${D.ac}</span> <span class="muted small">Your training: ${D.armorTraining.join(", ") || "none"}</span></p>
+    ${D.armor.kind !== "none" ? `<p class="small">${esc(armorInfo(D.armor, D))}</p>` : ""}
     <h3>Coins</h3><div class="row">${["cp", "sp", "ep", "gp", "pp"].map(k => `<label>${k.toUpperCase()} ${inp("coins." + k, +c.coins[k] || 0, { type: "number" })}</label>`).join("")}</div>
     <h3 style="margin-top:12px">Misc. bonuses</h3><div class="row"><label>Initiative ${inp("initBonus", +c.initBonus || 0, { type: "number" })}</label><label>Speed ${inp("speedBonus", +c.speedBonus || 0, { type: "number" })}</label><label>Max HP ${inp("hpBonus", +c.hpBonus || 0, { type: "number" })}</label></div>
   </div>
@@ -349,11 +383,54 @@ function bEquipment(c, D) {
       <tr><td colspan="6" class="small muted" style="border-bottom:2px solid var(--line)">${esc(D.attacks[i].props)} · ability ${sel(`weapons.${i}.abil`, w.abil || "auto", [["auto", "auto"], ...ABILITIES.map(a => [a, ABBR[a]])])} · proficient ${sel(`weapons.${i}.prof`, w.prof === true ? "y" : w.prof === false ? "n" : "", [["", "auto"], ["y", "yes"], ["n", "no"]], { attr: 'data-tri' })} · extra damage ${inp(`weapons.${i}.extra`, w.extra || "", { ph: "e.g. 1d6 fire", style: "width:110px" })}</td></tr>`).join("")}</table>
     <div class="row" style="margin-top:8px"><select id="addw">${WEAPONS.map(w => `<option>${w.name}</option>`).join("")}</select><button class="small" data-act="addWeapon">Add weapon</button></div>
   </div></div>
+  ${startEquipCard(c, D)}
   <div class="card"><h3>Equipment & items</h3>
     <table class="t"><tr><th>Item</th><th class="num">Qty</th><th>Notes</th><th></th></tr>
     ${c.items.map((it, i) => `<tr><td>${inp(`items.${i}.name`, it.name, { style: "width:100%" })}</td><td class="num">${inp(`items.${i}.qty`, +it.qty || 1, { type: "number", style: "width:60px" })}</td><td>${inp(`items.${i}.note`, it.note || "", { style: "width:100%" })}</td><td><button class="small ghost" data-act="del" data-p="items" data-i="${i}">✕</button></td></tr>`).join("")}</table>
     <button class="small" style="margin-top:8px" data-act="addItem">+ Add item</button>
   </div>`;
+}
+
+function armorInfo(a, D) {
+  const kind = { light: "Light", medium: "Medium", heavy: "Heavy" }[a.kind];
+  const parts = [kind + " armor", "AC " + a.base + (a.kind === "light" ? " + Dex" : a.kind === "medium" ? " + Dex (max 2)" : "")];
+  if (a.str) parts.push(`needs Str ${a.str}` + (D && D.score.str < a.str ? " ✗ (−10 ft speed)" : " ✓"));
+  if (a.stealth) parts.push("Disadvantage on Stealth");
+  if (D && !D.armorTraining.includes(kind + " armor")) parts.push("✗ NOT trained: Disadvantage on Str/Dex rolls and no spellcasting");
+  return parts.join(" · ");
+}
+function armorSelect(c, D) {
+  const groups = [["light", "Light armor"], ["medium", "Medium armor"], ["heavy", "Heavy armor"]];
+  return `<select ${bindA("armor")}><option value="" ${!c.armor ? "selected" : ""}>No armor</option>${groups.map(([k, l]) => {
+    const trained = D.armorTraining.includes(l);
+    return `<optgroup label="${l}${trained ? "" : " — not trained"}">${Object.entries(ARMOR).filter(([id, a]) => a.kind === k).map(([id, a]) =>
+      `<option value="${id}" ${c.armor === id ? "selected" : ""}>${a.name} — AC ${a.base}${k === "light" ? "+Dex" : k === "medium" ? "+Dex(2)" : ""}${a.str ? " · Str " + a.str : ""}${a.stealth ? " · Stealth dis." : ""}</option>`).join("")}</optgroup>`;
+  }).join("")}</select>`;
+}
+function startEquipCard(c, D) {
+  const cls = D.startCls, bg = c.background.id;
+  const ce = cls ? START_EQUIP.class[cls] : null, be = START_EQUIP.background[bg];
+  if (!ce && !be) return `<div class="card"><h3>Starting equipment</h3><p class="muted small">Choose a class and background first.</p></div>`;
+  const se = S.ui.se ||= {}; se.c ||= "A"; se.b ||= "A";
+  const line = l => l.map(esc).join(", ");
+  return `<div class="card"><h3>Starting equipment</h3>
+    ${ce ? `<p><b>${CLASSES[cls].name}</b> — choose one:</p>${Object.entries(ce).map(([k, l]) => `<label style="display:block;margin:3px 0"><input type="radio" name="sec" data-act="seOpt" data-w="c" value="${k}" ${se.c === k ? "checked" : ""}> <b>${k}:</b> ${line(l)}</label>`).join("")}` : ""}
+    ${be ? `<p style="margin-top:8px"><b>${BACKGROUNDS[bg].name}</b> — choose one:</p>
+      <label style="display:block;margin:3px 0"><input type="radio" name="seb" data-act="seOpt" data-w="b" value="A" ${se.b === "A" ? "checked" : ""}> <b>A:</b> ${line(be)}</label>
+      <label style="display:block;margin:3px 0"><input type="radio" name="seb" data-act="seOpt" data-w="b" value="B" ${se.b === "B" ? "checked" : ""}> <b>B:</b> ${START_EQUIP.backgroundGold} GP</label>` : ""}
+    <div class="row" style="margin-top:8px"><button data-act="applyStartEquip">Add to my equipment</button>${c.startEquipDone ? '<span class="small muted">Already added once — adding again duplicates items.</span>' : '<span class="small muted">Weapons go to Attacks, armor/shield are equipped, gold goes to Coins.</span>'}</div></div>`;
+}
+function applyStartEquip(c, list) {
+  for (const raw of list) {
+    let m = raw.match(/^(\d+)\s*GP$/i); if (m) { c.coins.gp = (+c.coins.gp || 0) + +m[1]; continue; }
+    m = raw.match(/^(\d+)\s+(.*)$/); const qty = m ? +m[1] : 1; const name = m ? m[2] : raw;
+    const w = WEAPONS.find(x => x.name.toLowerCase() === name.toLowerCase());
+    if (w) { c.weapons.push({ name: w.name, base: w.name, magic: 0, notes: qty > 1 ? "×" + qty : "" }); continue; }
+    const ak = Object.keys(ARMOR).find(k => k && ARMOR[k].name.toLowerCase() === name.toLowerCase());
+    if (ak) { c.armor = ak; continue; }
+    if (/^shield$/i.test(name)) { c.shield = true; continue; }
+    c.items.push({ name, qty, note: "" });
+  }
 }
 
 function bStory(c) {

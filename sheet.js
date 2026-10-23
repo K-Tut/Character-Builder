@@ -7,12 +7,14 @@ function pips(key, max, used, label) {
   return `<span class="pips" title="${esc(label || "")}">${Array.from({ length: max }, (_, i) => `<span class="pip ${i < rem ? "" : "used"}" data-act="pip" data-k="${key}" data-i="${i}" data-m="${max}"></span>`).join("")}</span>`;
 }
 
+const R = (title, mod) => `data-act="roll" data-k="d20" data-m="${mod}" data-t="${esc(title)}" title="Roll ${esc(title)}"`;
+const RD = (title, f) => `data-act="roll" data-k="dmg" data-f="${esc(f)}" data-t="${esc(title)}" title="Roll ${esc(title)}"`;
 function renderSheet() {
   const c = S.char, D = derive(c), P = c.play;
   if (!D.level) return `<div class="card"><h2>${esc(c.name)}</h2><p>This character has no class levels yet.</p><button data-act="levelup">Choose first class</button> <button class="ghost" data-act="view" data-v="builder">Open builder</button></div>`;
   const hp = Math.min(P.hp ?? D.hpMax, D.hpMax);
   const pct = Math.max(0, Math.min(100, 100 * hp / D.hpMax));
-  const bg = BACKGROUNDS[c.background.id];
+  const bg = bgData(c);
   let h = `<div class="card"><div class="hero">${c.portrait ? `<img src="${c.portrait}">` : ""}<div class="grow"><h2>${esc(c.name)}</h2>
     <div>${esc(classLine(D))}</div><div class="muted small">${esc([D.species?.name + (c.species.choice ? " (" + c.species.choice + ")" : ""), bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div></div>
     <div class="row"><button data-act="levelup">⬆ Level up</button><button class="ghost" data-act="shortRest">☕ Short rest</button><button class="ghost" data-act="longRest">🌙 Long rest</button>
@@ -21,15 +23,16 @@ function renderSheet() {
 
   // column 1: abilities & skills
   let c1 = `<div class="card"><h3>Abilities</h3><div class="abil small muted"><span></span><span class="num">Score</span><span class="num">Mod</span><span class="num">Save</span></div>
-    ${ABILITIES.map(a => `<div class="abil" style="background:var(--${a})"><b>${ABILITY_NAMES[a]}</b><span class="num">${D.score[a]}</span><span class="m">${sgn(D.mod[a])}</span><span class="num">${D.saveProf.has(a) ? "●" : "○"} ${sgn(D.save[a])}</span></div>`).join("")}</div>
-    <div class="card"><h3>Skills</h3>${ALL_SKILLS.map(s => { const k = D.skill[s]; return `<div class="skill" style="background:var(--${k.a})"><span><span class="dot ${k.e ? "e" : k.p ? "p" : ""}"></span>${s} <span class="muted small">${ABBR[k.a]}</span></span><b>${sgn(k.v)}</b></div>`; }).join("")}
+    ${ABILITIES.map(a => `<div class="abil" style="background:var(--${a})"><b>${ABILITY_NAMES[a]}</b><span class="num">${D.score[a]}</span><span class="m roll" ${R(ABILITY_NAMES[a] + " check", D.mod[a])}>${sgn(D.mod[a])}</span><span class="num roll" ${R(ABILITY_NAMES[a] + " saving throw", D.save[a])}>${D.saveProf.has(a) ? "●" : "○"} ${sgn(D.save[a])}</span></div>`).join("")}
+    <p class="small muted" style="margin:6px 0 0">🎲 Tap a modifier, save or skill to roll.</p></div>
+    <div class="card"><h3>Skills</h3>${SKILLS_BY_ABILITY.map(s => { const k = D.skill[s]; return `<div class="skill roll" style="background:var(--${k.a})" ${R(s + " check", k.v)}><span><span class="dot ${k.e ? "e" : k.p ? "p" : ""}"></span>${s} <span class="muted small">${ABBR[k.a]}</span></span><b>${sgn(k.v)}</b></div>`; }).join("")}
     <p class="small" style="margin:8px 0 0">Passive Perception <b>${D.passive.perception}</b> · Insight <b>${D.passive.insight}</b> · Investigation <b>${D.passive.investigation}</b></p></div>
     <div class="card"><h3>Proficiencies</h3><p class="small"><b>Armor:</b> ${esc(D.armorTraining.join(", ") || "none")}<br><b>Weapons:</b> ${esc(D.weaponText || "none")}<br><b>Tools:</b> ${esc(D.tools.join(", ") || "none")}<br><b>Languages:</b> ${esc(c.languages)}${c.otherProfs ? "<br>" + esc(c.otherProfs) : ""}</p></div>`;
 
   // column 2: combat
   const exh = +P.exhaustion || 0;
   let c2 = `<div class="card"><div class="stats">
-    <div class="stat"><div class="v">${D.ac}</div><div class="k">Armor Class</div></div><div class="stat"><div class="v">${sgn(D.init)}</div><div class="k">Initiative</div></div>
+    <div class="stat"><div class="v">${D.ac}</div><div class="k">Armor Class</div></div><div class="stat roll" ${R("Initiative", D.init)}><div class="v">${sgn(D.init)}</div><div class="k">Initiative 🎲</div></div>
     <div class="stat"><div class="v">${D.speed}</div><div class="k">Speed ft</div></div><div class="stat"><div class="v">${sgn(D.pb)}</div><div class="k">Prof. Bonus</div></div></div>
     <p class="small muted" style="margin:8px 0 0">${D.size}${D.darkvision ? " · Darkvision " + D.darkvision + " ft" : ""}${D.resist.length ? " · Resistances: " + esc(D.resist.join(", ")) : ""}</p></div>
   <div class="card"><h3>Hit Points</h3>
@@ -39,12 +42,12 @@ function renderSheet() {
     <div class="hpbar"><div style="width:${pct}%;background:${pct < 30 ? "#b33" : pct < 60 ? "var(--warn)" : "var(--good)"}"></div></div>
     <div class="row"><input id="hpAmt" type="number" min="0" placeholder="amount" style="width:90px"><button class="danger" data-act="hp" data-m="dmg">Damage</button><button style="background:var(--good)" data-act="hp" data-m="heal">Heal</button><button class="ghost" data-act="hp" data-m="temp">Set temp</button></div>
     <div class="row small" style="margin-top:10px"><b>Hit Dice:</b>${D.hitDice.map(x => `<span>${x.die}: ${pips("hd_" + x.die, x.n, P.hd[x.die])}</span>`).join("")}</div>
-    ${hp <= 0 ? `<div class="row" style="margin-top:8px"><b>Death saves</b> ✔ ${[0, 1, 2].map(i => `<input type="checkbox" data-act="ds" data-k="s" data-i="${i}" ${P.ds.s > i ? "checked" : ""}>`).join("")} ✖ ${[0, 1, 2].map(i => `<input type="checkbox" data-act="ds" data-k="f" data-i="${i}" ${P.ds.f > i ? "checked" : ""}>`).join("")}</div>` : ""}
+    ${hp <= 0 ? `<div class="row" style="margin-top:8px"><button class="small" ${R("Death saving throw", 0)}>🎲 Roll</button><b>Death saves</b> ✔ ${[0, 1, 2].map(i => `<input type="checkbox" data-act="ds" data-k="s" data-i="${i}" ${P.ds.s > i ? "checked" : ""}>`).join("")} ✖ ${[0, 1, 2].map(i => `<input type="checkbox" data-act="ds" data-k="f" data-i="${i}" ${P.ds.f > i ? "checked" : ""}>`).join("")}</div>` : ""}
   </div>
   <div class="card"><h3>Conditions</h3><div>${CONDITIONS.map(x => `<span class="chip ${P.conditions.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="cond" data-v="${x}">${x}</span>`).join("")}</div>
     <div class="row" style="margin-top:8px"><label>Exhaustion ${sel("play.exhaustion", exh, [0, 1, 2, 3, 4, 5, 6], { num: true })}</label>${exh ? `<span class="small warn">−${2 * exh} to d20 tests, −${5 * exh} ft speed${exh >= 6 ? " — DEAD" : ""}</span>` : ""}</div></div>
-  <div class="card"><h3>Attacks</h3>${D.attacks.length ? `<table class="t"><tr><th>Weapon</th><th class="num">Hit</th><th>Damage</th></tr>${D.attacks.map(a => `<tr><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.props)}</div></td><td class="num big" style="font-size:17px">${sgn(a.hit)}</td><td>${esc(a.dmg)}</td></tr>`).join("")}</table>` : '<p class="muted small">Add weapons in Build → Equipment.</p>'}
-    ${D.cls.rogue ? `<p class="small">Sneak Attack: <b>${Math.ceil(D.cls.rogue / 2)}d6</b></p>` : ""}${D.cls.barbarian ? `<p class="small">Rage damage: <b>+${at(step({ 1: 2, 9: 3, 16: 4 }), D.cls.barbarian)}</b></p>` : ""}</div>`;
+  <div class="card"><h3>Attacks</h3>${D.attacks.length ? `<table class="t"><tr><th>Weapon</th><th class="num">Hit</th><th>Damage</th></tr>${D.attacks.map(a => `<tr><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.props)}</div></td><td class="num big roll" style="font-size:17px" ${R(a.name + " attack", a.hit)}>${sgn(a.hit)}</td><td class="roll" ${RD(a.name + " damage", a.dmgFormula)}>${esc(a.dmg)}</td></tr>`).join("")}</table>` : '<p class="muted small">Add weapons in Build → Equipment.</p>'}
+    ${D.cls.rogue ? `<p class="small">Sneak Attack: <b class="roll" ${RD("Sneak Attack", Math.ceil(D.cls.rogue / 2) + "d6")}>🎲 ${Math.ceil(D.cls.rogue / 2)}d6</b></p>` : ""}${D.cls.barbarian ? `<p class="small">Rage damage: <b>+${at(step({ 1: 2, 9: 3, 16: 4 }), D.cls.barbarian)}</b></p>` : ""}</div>`;
   if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b>${esc(r.name)}</b>${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${pips(r.key, r.max, P.used[r.key])}</div>`).join("")}</div>`;
   if (D.slots.length || D.pact) c2 += `<div class="card"><h3>Spell slots</h3>${D.slots.map((n, i) => `<div class="res"><span class="n">Level ${i + 1}</span>${pips("slot_" + (i + 1), n, P.slots[i + 1])}</div>`).join("")}
     ${D.pact ? `<div class="res"><span class="n">Pact slots (level ${D.pact.lvl}) <span class="small muted">short rest</span></span>${pips("pact", D.pact.n, P.pact)}</div>` : ""}</div>`;
@@ -68,7 +71,7 @@ function renderSheet() {
 function featRow(f) {
   return `<div class="feat"><div class="h" data-act="toggleOpen"><b>${esc(f.name)}</b>${f.note ? `<span class="chip">${esc(f.note)}</span>` : ""}<span class="src">${esc(f.src)}</span>
     <button class="small ghost" data-act="featEdit" data-k="${esc(f.key)}" title="Edit">✎</button></div>
-    <div class="body hidden"><div class="desc">${para(f.text) || '<span class="muted">No description — click ✎ to add one.</span>'}</div></div></div>`;
+    <div class="body hidden"><div class="desc">${diceLinks(para(f.text), f.name) || '<span class="muted">No description — click ✎ to add one.</span>'}</div></div></div>`;
 }
 function sheetFeatures(c, D) {
   const vis = D.features.filter(f => S.ui.showHidden || !f.hidden);
@@ -82,13 +85,13 @@ function sheetSpells(c, D) {
   const add = (name, src, always, lvlHint) => { const si = spellInfo(name); const l = si?.level ?? lvlHint ?? "?"; (groups[l] ||= []).push({ name, src, always, si }); };
   D.alwaysSpells.forEach(s => add(s.name, s.src, true));
   c.spells.forEach(s => add(s.name, s.cls === "other" ? "Other" : CLASSES[s.cls]?.name || s.cls, false, s.level));
-  let h = D.casters.map(cs => `<span class="chip acc">${cs.name}: DC ${cs.dc} · Atk ${sgn(cs.atk)}</span>`).join("") + `<button class="small ghost" data-act="goSpells" style="margin-left:6px">Change spells</button>`;
+  let h = D.casters.map(cs => `<span class="chip acc roll" ${R(cs.name + " spell attack", cs.atk)}>${cs.name}: DC ${cs.dc} · Atk ${sgn(cs.atk)} 🎲</span>`).join("") + `<button class="small ghost" data-act="goSpells" style="margin-left:6px">Change spells</button>`;
   if (!Object.keys(groups).length) return h + `<p class="muted">No spells.</p>`;
   for (const l of Object.keys(groups).sort((a, b) => (a === "?" ? 99 : a) - (b === "?" ? 99 : b))) {
     const slotN = +l ? (D.slots[l - 1] || 0) : 0;
     h += `<h3 style="margin-top:12px">${l === "?" ? "Other spells" : +l ? "Level " + l : "Cantrips"} ${+l && slotN ? pips("slot_" + l, slotN, c.play.slots[l]) : ""}</h3>`;
     h += groups[l].sort((a, b) => a.name.localeCompare(b.name)).map(s => `<div class="spell"><div class="h" data-act="toggleOpen"><b style="flex:1">${esc(s.name)}</b>${s.si?.conc ? '<span class="tag">C</span>' : ""}${s.si?.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.si?.time || "")}${s.si?.range ? " · " + esc(s.si.range) : ""}</span><span class="tag">${esc(s.src)}${s.always ? " ★" : ""}</span></div>
-      <div class="body hidden">${s.si ? `<div class="meta">${esc([s.si.time && "Casting time: " + s.si.time, s.si.range && "Range: " + s.si.range, s.si.comp && "Components: " + s.si.comp, s.si.dur && "Duration: " + s.si.dur].filter(Boolean).join(" · "))}</div><div class="desc">${para(s.si.text)}</div>` : '<span class="muted small">No description imported.</span>'}</div></div>`).join("");
+      <div class="body hidden">${s.si ? `<div class="meta">${esc([s.si.time && "Casting time: " + s.si.time, s.si.range && "Range: " + s.si.range, s.si.comp && "Components: " + s.si.comp, s.si.dur && "Duration: " + s.si.dur].filter(Boolean).join(" · "))}</div><div class="desc">${diceLinks(para(s.si.text), s.name)}</div>` : '<span class="muted small">No description imported.</span>'}</div></div>`).join("");
   }
   return h;
 }
@@ -225,7 +228,7 @@ const ACT = {
   },
   deleteChar: async () => { if (!confirm("Delete " + S.char.name + " on all devices?")) return; await storeDeleteChar(S.char.id); S.char = null; S.view = "home"; await loadChars(); render(); },
   setSpecies: el => { const c = S.char; if (c.species.id !== el.dataset.id) { c.species = { id: el.dataset.id, choice: "", size: "" }; delete c.pools.keenSenses; delete c.pools.skillful; } save(); render(); },
-  setBg: el => { const c = S.char; if (c.background.id !== el.dataset.id) { c.background = { id: el.dataset.id, mode: "21", plus2: "", plus1: "", tool: "" }; c.bgFeat = { picks: {} }; } save(); render(); },
+  setBg: el => { const c = S.char; if (c.background.id !== el.dataset.id) { c.background = { id: el.dataset.id, mode: "21", plus2: "", plus1: "", tool: "", skills: [], p111: [] }; c.bgFeat = { picks: {} }; } save(); render(); },
   pbm: el => { const a = el.dataset.a; S.char.base[a] = Math.max(8, Math.min(15, S.char.base[a] + +el.dataset.d)); save(); render(); },
   stdArray: () => { const D = derive(S.char); const order = [...ABILITIES].sort((a, b) => (D.startCls && CLASSES[D.startCls].primary.includes(b) ? 1 : 0) - (D.startCls && CLASSES[D.startCls].primary.includes(a) ? 1 : 0)); [15, 14, 13, 12, 10, 8].forEach((v, i) => S.char.base[order[i]] = v); save(); render(); },
   levelup: () => startLevelUp(),
@@ -298,6 +301,29 @@ const ACT = {
   },
   featReset: () => { const m = S.char.featureMeta[S.modal.key]; if (m) delete m.text; closeModal(); save(); render(); },
   printNow: () => window.print(),
+  bgFilter: el => { S.ui.bgFilter = el.dataset.a; render(); },
+  optInfo: el => { const o = el.dataset.v; S.ui.optInfo = o && !(S.ui.optInfo && S.ui.optInfo.pk === el.dataset.k && S.ui.optInfo.o === o) ? { pk: el.dataset.k, o } : null; S.modal ? renderModal() : render(); },
+  applyStartEquip: () => {
+    const c = S.char, D = derive(c), se = S.ui.se || { c: "A", b: "A" };
+    if (c.startEquipDone && !confirm("Starting equipment was already added. Add it again?")) return;
+    const ce = D.startCls ? START_EQUIP.class[D.startCls] : null, be = START_EQUIP.background[c.background.id];
+    if (ce) applyStartEquip(c, ce[se.c] || ce.A);
+    if (be) applyStartEquip(c, se.b === "B" ? [START_EQUIP.backgroundGold + " GP"] : be);
+    c.startEquipDone = true; save(); render(); toast("Starting equipment added");
+  },
+  wikiUnlock: async () => {
+    const pw = $("#wikiPw").value; if (!pw) return toast("Enter the password");
+    try { toast("Unlocking…"); await WikiLock.unlock(pw, $("#wikiPwRem").checked); render(); toast("Rules text unlocked"); }
+    catch (e) { toast(e.message === "Wrong password" ? "Wrong password" : "Could not unlock: " + e.message); }
+  },
+  wikiEncExport: async () => {
+    const pw = prompt("Choose a password for the rules text (share it only with your group):"); if (!pw) return;
+    if (prompt("Type the password again:") !== pw) return toast("Passwords did not match");
+    toast("Encrypting…");
+    const txt = await WikiLock.encrypt(S.wiki, pw);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "application/octet-stream" })); a.download = "wiki.enc"; a.click();
+    toast("Saved wiki.enc — upload it to your GitHub repo");
+  },
   mtab: el => { const k = el.dataset.k; S.mtab = k; if (!["combat", "stats"].includes(k)) S.sheetTab = k; render(); window.scrollTo(0, 0); },
   syncConnect: async () => { const i = $("#clientId"); if (i && i.value.trim()) { S.settings.clientId = i.value.trim(); await DB.set("settings", S.settings); } await Sync.connect(); render(); },
   syncNow: async () => { await Sync.run(); render(); },
@@ -323,6 +349,11 @@ const CHG = {
   luHp: () => { const lv = S.draft.levels[S.draft.levels.length - 1]; lv.hp = null; },
   ds: el => { const P = S.char.play; const k = el.dataset.k, i = +el.dataset.i; P.ds[k] = el.checked ? i + 1 : i; },
   showHidden: el => { S.ui.showHidden = el.checked; },
+  bgSkill: el => { const b = S.char.background; const a = b.skills ||= []; const v = el.dataset.v; const i = a.indexOf(v); if (i >= 0) a.splice(i, 1); else if (a.length < 2) a.push(v); },
+  bgFeatSwap: el => { const b = S.char.background; b.swapFeat = el.checked; b.featOverride = ""; S.char.bgFeat = { picks: {} }; },
+  setBgFeat: el => { S.char.background.featOverride = el.value; S.char.bgFeat = { picks: {} }; },
+  featFilter: el => { S.ui.featFilter = el.value; },
+  seOpt: el => { (S.ui.se ||= { c: "A", b: "A" })[el.dataset.w] = el.value; },
   popt: el => { const o = S.ui.print; o[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value; }
 };
 
@@ -363,6 +394,7 @@ $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && 
     try { const st = await (await fetch("api/import", { cache: "no-store" })).json(); if (st.running) { S.ui.import = st; pollImport(); } } catch (e) { }
     await Folder.pull();
   }
+  await WikiLock.check();
   await loadChars();
   Sync.loadToken();
   render(); renderSyncChip();

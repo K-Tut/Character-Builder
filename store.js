@@ -44,6 +44,46 @@ async function storeDeleteChar(id) {
   const tomb = (await DB.get("tombstones")) || {}; tomb[id] = Date.now(); await DB.set("tombstones", tomb);
   Sync.soon();
 }
+// ---------- password-protected rules text (wiki.enc in the GitHub repo) ----------
+const WikiLock = {
+  b64(buf) { const b = new Uint8Array(buf); let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); },
+  unb64(s) { const bin = atob(s); const b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b; },
+  async key(pw, salt, iter) {
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: iter, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  },
+  async encrypt(obj, pw) {
+    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), iter = 250000;
+    const plain = { ...obj }; delete plain._updated; delete plain._encTag;
+    const gz = await new Response(new Blob([JSON.stringify(plain)]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+    const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await this.key(pw, salt, iter), gz);
+    return JSON.stringify({ format: "dnd-builder-wiki-v1", imported: obj.imported || "", iter, salt: this.b64(salt), iv: this.b64(iv), data: this.b64(data) });
+  },
+  async decrypt(enc, pw) {
+    const key = await this.key(pw, this.unb64(enc.salt), enc.iter);
+    let gz;
+    try { gz = await crypto.subtle.decrypt({ name: "AES-GCM", iv: this.unb64(enc.iv) }, key, this.unb64(enc.data)); }
+    catch (e) { throw new Error("Wrong password"); }
+    return JSON.parse(await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream("gzip"))).text());
+  },
+  // look for wiki.enc next to the app; unlock silently if the password is remembered
+  async check() {
+    let enc;
+    try { const r = await fetch("wiki.enc", { cache: "no-store" }); if (!r.ok) return; enc = await r.json(); if (enc.format !== "dnd-builder-wiki-v1") return; } catch (e) { return; }
+    S.ui.wikiEnc = enc;
+    if (S.wiki && S.wiki._encTag === enc.iv) { S.ui.wikiEncState = "current"; return; }
+    S.ui.wikiEncState = "locked";
+    let pw = null; try { pw = localStorage.getItem("wikiPw"); } catch (e) { }
+    if (pw) { try { await this.unlock(pw, true); } catch (e) { } }
+  },
+  async unlock(pw, remember) {
+    const enc = S.ui.wikiEnc; const w = await this.decrypt(enc, pw);
+    w._encTag = enc.iv; await storeSetWiki(w, true);
+    try { remember ? localStorage.setItem("wikiPw", pw) : localStorage.removeItem("wikiPw"); } catch (e) { }
+    S.ui.wikiEncState = "current";
+  }
+};
+
 async function storeSetWiki(w, fromRemote) {
   w._updated = fromRemote ? (w._updated || Date.now()) : Date.now();
   await DB.set("wiki", w);

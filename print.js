@@ -23,10 +23,10 @@ function popSel(k, v, opts) { return `<select data-act="popt" data-k="${k}">${op
 function pBox(label, inner, cls = "", style = "") { return `<div class="pbox ${cls}" style="${style}"><div class="plabel">${label}</div>${inner}</div>`; }
 
 function pPage1(c, D) {
-  const bg = BACKGROUNDS[c.background.id];
+  const bg = bgData(c);
   const P = c.play;
   const abil = `<table class="ptab"><tr class="phead"><th>Abilities:</th><th>Score:</th><th>Modifier:</th><th>Save</th></tr>${ABILITIES.map(a => `<tr class="pa-${a}"><td>${ABILITY_NAMES[a]}</td><td class="c">${D.score[a]}</td><td class="c b">${sgn(D.mod[a])}</td><td class="c">${sgn(D.save[a])}${D.saveProf.has(a) ? " ●" : ""}</td></tr>`).join("")}</table>`;
-  const skills = `<table class="ptab"><tr class="phead"><th>Skills</th><th>Modifier</th></tr>${ALL_SKILLS.map(s => { const k = D.skill[s]; return `<tr class="pa-${k.a}"><td><span class="pdot ${k.e ? "e" : k.p ? "p" : ""}"></span>${s}</td><td class="c">${sgn(k.v)}${k.e ? " (E)" : ""}</td></tr>`; }).join("")}</table>
+  const skills = `<table class="ptab"><tr class="phead"><th>Skills</th><th>Modifier</th></tr>${SKILLS_BY_ABILITY.map(s => { const k = D.skill[s]; return `<tr class="pa-${k.a}"><td><span class="pdot ${k.e ? "e" : k.p ? "p" : ""}"></span>${s}</td><td class="c">${sgn(k.v)}${k.e ? " (E)" : ""}</td></tr>`; }).join("")}</table>
     <div class="psmall">Passive Perception <b>${D.passive.perception}</b> · Insight <b>${D.passive.insight}</b></div>`;
   const items = c.items.filter(i => i.name).map(i => `${esc(i.name)}${+i.qty > 1 ? " ×" + i.qty : ""}${i.note ? ` <span class="pmuted">(${esc(i.note)})</span>` : ""}`).join(", ");
   const coins = ["pp", "gp", "ep", "sp", "cp"].filter(k => +c.coins[k]).map(k => `${c.coins[k]} ${k}`).join(", ");

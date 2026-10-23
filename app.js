@@ -50,11 +50,11 @@ function buildIndex() {
   idx.spellList.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   S.idx = idx;
 }
-function findPage(cat, name, exclude) {
+function findPage(cat, name, exclude, fuzzy) {
   const list = (S.idx.pages[cat] || []).filter(p => !exclude || !exclude(p));
   const n = norm(name); if (!n) return null;
   let hit = list.find(p => p.n === n) || list.find(p => p.n.endsWith(" " + n) || p.n.startsWith(n + " ")) || list.find(p => p.n.includes(n));
-  if (!hit) {
+  if (!hit && fuzzy) {
     const stop = new Set(["of", "the", "path", "college", "domain", "circle", "oath", "warrior", "patron", "sorcery", "and"]);
     const toks = n.split(" ").filter(t => !stop.has(t));
     let best = 0;
@@ -77,7 +77,7 @@ function lookup(name, slugs = []) {
 }
 function spellInfo(name) { return S.idx.spell[norm(name)] || null; }
 function classSlug(cls) { return S.wiki.pages[cls + ":main"] ? cls + ":main" : findPage(cls, CLASSES[cls].name); }
-function subclassSlug(cls, sub) { const sc = CLASSES[cls].subclasses[sub]; return sc ? findPage(cls, sc.name, p => p.slug.endsWith(":main")) : null; }
+function subclassSlug(cls, sub) { const sc = CLASSES[cls].subclasses[sub]; return sc ? findPage(cls, sc.name, p => p.slug.endsWith(":main"), true) : null; }
 
 // ---------- character model ----------
 function newChar() {
@@ -96,16 +96,28 @@ function newChar() {
   };
 }
 
+// effective background (normal, with swapped origin feat, or fully custom)
+function bgData(c) {
+  const b = c.background || {};
+  if (b.id === "custom") return { id: "custom", name: b.customName || "Custom background", abil: ABILITIES, feat: b.featOverride || "", skills: (b.skills || []).slice(0, 2), tool: b.tool || "", custom: true };
+  const base = BACKGROUNDS[b.id]; if (!base) return null;
+  return { ...base, id: b.id, origFeat: base.feat, feat: b.swapFeat ? (b.featOverride || "") : base.feat, featChanged: !!b.swapFeat, tool: base.tool.startsWith("One") ? (b.tool || base.tool) : base.tool };
+}
+
 // collect all feats (with ability choices) the character has
 function allFeats(c) {
   const out = [];
-  const bg = BACKGROUNDS[c.background.id];
-  if (bg) {
+  const bg = bgData(c);
+  if (bg && bg.feat) {
     const m = bg.feat.match(/^(.*?)\s*\((.*)\)$/);
     const name = m ? m[1] : bg.feat;
     const picks = { ...(c.bgFeat.picks || {}) }; if (m) picks.list = m[2];
     out.push({ name, picks, src: "Background (" + bg.name + ")", origin: true });
   }
+  return out.concat(restFeats(c));
+}
+function restFeats(c) {
+  const out = [];
   if (SPECIES[c.species.id]?.extraOriginFeat && c.speciesFeat?.name) out.push({ ...c.speciesFeat, src: "Species (Versatile)", origin: true });
   c.levels.forEach((lv, i) => {
     if (lv.asi?.mode === "feat" && lv.asi.feat?.name) out.push({ ...lv.asi.feat, src: CLASSES[lv.cls].name + " lvl " + classLevelAt(c, i) });
@@ -128,9 +140,9 @@ function derive(c) {
 
   // ability scores
   const bonus = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
-  const bg = BACKGROUNDS[c.background.id];
+  const bg = bgData(c);
   if (bg) {
-    if (c.background.mode === "111") bg.abil.forEach(a => bonus[a] += 1);
+    if (c.background.mode === "111") (bg.custom ? [...new Set(c.background.p111 || [])].slice(0, 3) : bg.abil).forEach(a => bonus[a] += 1);
     else { if (c.background.plus2) bonus[c.background.plus2] += 2; if (c.background.plus1 && c.background.plus1 !== c.background.plus2) bonus[c.background.plus1] += 1; }
   }
   let max30 = {};
@@ -165,7 +177,7 @@ function derive(c) {
 
   // proficiencies: skills
   const prof = new Set(), exp = new Set(), tools = new Set();
-  if (bg) { bg.skills.forEach(s => prof.add(s)); tools.add(c.background.tool || bg.tool); }
+  if (bg) { bg.skills.forEach(s => prof.add(s)); if (bg.tool) tools.add(bg.tool); }
   for (const k in D.pools) if (k.startsWith("skills:") || k === "skillsLore" || k === "keenSenses" || k === "skillful" || k === "primalKnowledge") picked(k).slice(0, D.pools[k].max).forEach(s => prof.add(s));
   D.feats.forEach(f => {
     if (f.name === "Skilled") (f.picks?.skills || []).forEach(s => SKILLS[s] ? prof.add(s) : tools.add(s));
@@ -194,13 +206,13 @@ function derive(c) {
     const C = CLASSES[k], src = k === D.startCls ? C : C.mc;
     (src.armor || []).forEach(x => armorT.add(x)); (src.wprof || []).forEach(x => wT.add(x)); (src.tools || []).forEach(x => tools.add(x));
     if (k !== D.startCls) C.wprof.forEach(x => x === "simple" && wT.add(x));
-    const sub = D.subs[k]; if (sub) { (sub.armor || []).forEach(x => armorT.add(x)); (sub.wprof || []).forEach(x => wT.add(x)); }
+    const sub = D.subs[k]; if (sub) { (sub.armor || []).forEach(x => armorT.add(x)); (sub.wprof || []).forEach(x => wT.add(x)); (sub.tools || []).forEach(x => tools.add(x)); }
   }
   D.fx.armor.forEach(x => armorT.add(x)); D.fx.wprof.forEach(x => wT.add(x));
   D.feats.forEach(f => { const fd = FEATS[f.name] || {}; (fd.armor || []).forEach(x => armorT.add(x)); (fd.wprof || []).forEach(x => wT.add(x)); });
   D.armorTraining = ["Light armor", "Medium armor", "Heavy armor", "Shields"].filter(x => armorT.has(x));
   D.wprof = wT;
-  D.weaponText = wT.has("martial") ? "Simple and Martial weapons" : [wT.has("simple") && "Simple weapons", wT.has("martialFL") && "Martial weapons with Finesse or Light", wT.has("martialL") && "Martial weapons with Light"].filter(Boolean).join(", ");
+  D.weaponText = wT.has("martial") ? "Simple and Martial weapons" : [wT.has("simple") && "Simple weapons", wT.has("martialFL") && "Martial weapons with Finesse or Light", wT.has("martialL") && "Martial weapons with Light", wT.has("martialRanged") && "Martial ranged weapons"].filter(Boolean).join(", ");
   D.tools = [...tools].filter(Boolean);
 
   // HP
@@ -247,6 +259,7 @@ function derive(c) {
   }
   D.feats.forEach(f => speed += FEATS[f.name]?.speed || 0);
   speed += +c.speedBonus || 0;
+  if (arm.str && D.score.str < arm.str) { speed -= 10; D.warnings.push(`${arm.name} needs Strength ${arm.str} — speed −10 ft`); }
   if (c.play.exhaustion) speed = Math.max(0, speed - 5 * c.play.exhaustion);
   D.speed = speed;
   D.darkvision = spc.darkvision || sp?.darkvision || 0;
@@ -305,8 +318,9 @@ function derive(c) {
     const ranged = base.cat.endsWith("R");
     const monkWeapon = D.cls.monk && (base.cat === "unarmed" || base.cat.startsWith("simple") || (base.cat.startsWith("martial") && props.includes("light")));
     let ab = w.abil && w.abil !== "auto" ? w.abil : ranged ? "dex" : props.includes("finesse") || monkWeapon ? (D.mod.dex > D.mod.str ? "dex" : "str") : "str";
+    if ((!w.abil || w.abil === "auto") && D.subs.artificer?.battleReady && (+w.magic || 0) > 0 && D.mod.int > D.mod[ab]) ab = "int";   // Battle Ready
     const isMartial = base.cat.startsWith("martial");
-    let proficient = base.cat === "unarmed" || (base.cat.startsWith("simple") && wT.has("simple")) || (isMartial && (wT.has("martial") || (wT.has("martialFL") && /finesse|light/.test(props)) || (wT.has("martialL") && props.includes("light"))));
+    let proficient = base.cat === "unarmed" || (base.cat.startsWith("simple") && wT.has("simple")) || (isMartial && (wT.has("martial") || (wT.has("martialFL") && /finesse|light/.test(props)) || (wT.has("martialL") && props.includes("light")) || (wT.has("martialRanged") && base.cat === "martialR")));
     if (w.prof === true) proficient = true; if (w.prof === false) proficient = false;
     const magic = +w.magic || 0;
     let hit = D.mod[ab] + (proficient ? D.pb : 0) + magic + (ranged && styles.includes("Archery") ? 2 : 0);
@@ -315,7 +329,9 @@ function derive(c) {
     const dmod = D.mod[ab] + magic;
     const dmg = (dice === "1" && base.cat === "unarmed" && !D.cls.monk) ? `${Math.max(1, 1 + D.mod.str)} ${base.type}` : `${dice}${dmod ? sgn(dmod) : ""} ${base.type}`;
     const mastery = picked("mastery").some(m => m.startsWith(base.name + " (")) ? base.mastery : "";
-    return { name: w.name || base.name, props: [base.props, mastery && "Mastery: " + mastery].filter(Boolean).join("; "), hit, dmg: dmg + (w.extra ? " + " + w.extra : ""), formula: `d20+${ABBR[ab]}${proficient ? "+Prof" : ""}${magic ? "+" + magic : ""}`, dformula: `${dice}+${ABBR[ab]}`, notes: w.notes || "" };
+    const exDice = (w.extra || "").match(/\d*d\d+(\s*[+-]\s*\d+)?/);
+    const dmgFormula = ((dice === "1" && base.cat === "unarmed" && !D.cls.monk) ? String(Math.max(1, 1 + D.mod.str)) : `${dice}${dmod ? sgn(dmod) : ""}`) + (exDice ? "+" + exDice[0].replace(/\s+/g, "") : "");
+    return { dmgFormula, name: w.name || base.name, props: [base.props, mastery && "Mastery: " + mastery].filter(Boolean).join("; "), hit, dmg: dmg + (w.extra ? " + " + w.extra : ""), formula: `d20+${ABBR[ab]}${proficient ? "+Prof" : ""}${magic ? "+" + magic : ""}`, dformula: `${dice}+${ABBR[ab]}`, notes: w.notes || "" };
   });
 
   D.features = collectFeatures(c, D);
@@ -329,6 +345,21 @@ function summary(c, D) {
 }
 function classLine(D) {
   return Object.keys(D.cls).map(k => CLASSES[k].name + (D.subs[k] ? " (" + D.subs[k].name + ")" : "") + (Object.keys(D.cls).length > 1 ? " " + D.cls[k] : "")).join(" / ") || "—";
+}
+
+// ---------- option descriptions (invocations, metamagic, maneuvers, fighting styles…) ----------
+function optionText(pk, o) {
+  const name = String(o).replace(/\s*\((Slow|Nick|Push|Sap|Topple|Vex|Graze|Cleave)\)$/, "");
+  const prefer = { invocations: ["warlock:main", "warlock:eldritch-invocations", "warlock:invocations"], metamagic: ["sorcerer:main", "sorcerer:metamagic"],
+    maneuvers: [subclassSlug("fighter", "battlemaster"), "fighter:battle-master", "fighter:maneuvers"], divineOrder: ["cleric:main"], primalOrder: ["druid:main"], armorModel: [subclassSlug("artificer", "armorer")], fightingStyle: [] }[pk] || [];
+  if (pk === "fightingStyle") { const s = (S.idx.pages.feat || []).find(p => p.n === norm(name)); if (s) return pageText(s.slug); }
+  if (pk === "mastery") { const s = (S.idx.pages.mastery || []).find(p => p.n === norm(name)); if (s) return pageText(s.slug); }
+  for (const cat of ["invocation", "eldritch-invocation", "metamagic", "maneuver"]) { const s = (S.idx.pages[cat] || []).find(p => p.n === norm(name)); if (s) return pageText(s.slug); }
+  // exact heading match only, preferring the right class pages
+  const keys = headingKeys(name);
+  for (const k of keys) { const arr = S.idx.sec[k]; if (!arr) continue; for (const sl of prefer) { const h = arr.find(a => a.slug === sl); if (h) return stripSource(h.text); } }
+  for (const k of keys) { const arr = S.idx.sec[k]; if (!arr) continue; const h = arr.find(a => a.cat !== "spell" && a.cat !== "feat") || arr.find(a => a.cat !== "spell"); if (h) return stripSource(h.text); }
+  return "";
 }
 
 // ---------- features ----------
@@ -380,11 +411,10 @@ function collectFeatures(c, D) {
   }
   // pool picks (fighting styles, invocations, metamagic, maneuvers, orders)
   const poolSlugs = { invocations: ["warlock:main"], metamagic: ["sorcerer:main"], maneuvers: [subclassSlug("fighter", "battlemaster")], divineOrder: ["cleric:main"], primalOrder: ["druid:main"] };
-  for (const pk of ["fightingStyle", "invocations", "metamagic", "maneuvers", "divineOrder", "primalOrder"]) {
+  for (const pk of ["fightingStyle", "invocations", "metamagic", "maneuvers", "divineOrder", "primalOrder", "armorModel"]) {
     const p = D.pools[pk]; if (!p) continue;
     (c.pools[pk] || []).slice(0, p.max).forEach((o, i) => {
-      const fslug = findPage("feat", o) || findPage("invocation", o) || findPage("eldritch-invocation", o);
-      const text = (fslug ? pageText(fslug) : "") || lookup(o, (poolSlugs[pk] || []).filter(Boolean));
+      const text = optionText(pk, o);
       add("pool:" + pk + ":" + o + ":" + i, o, POOLS[pk].label, text, { cat: "option" });
     });
   }
