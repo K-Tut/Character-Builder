@@ -94,7 +94,8 @@ function pPowers(c, D, o) {
   c.spells.forEach(s => addS(s.name, s.cls === "other" ? "" : CLASSES[s.cls]?.name, false, s.level));
   let spells = "";
   if (Object.keys(groups).length) {
-    const casters = D.casters.map(cs => `${cs.name}: Spell DC <b>${cs.dc}</b> (8+${ABBR[cs.ability]}+Prof) · Spell Attack <b>${sgn(cs.atk)}</b>`).join(" &nbsp;|&nbsp; ");
+    const casters = D.casters.map(cs => `${cs.name}: Spell DC <b>${cs.dc}</b> (8+${ABBR[cs.ability]}+Prof) · Spell Attack <b>${sgn(cs.atk)}</b>`)
+      .concat(D.speciesCast && D.alwaysSpells.some(s => s.cls === "species") ? [`${esc(D.speciesCast.name)} spells: DC <b>${D.speciesCast.dc}</b> (8+${ABBR[D.speciesCast.ability]}+Prof) · Attack <b>${sgn(D.speciesCast.atk)}</b>`] : []).join(" &nbsp;|&nbsp; ");
     const slots = D.slots.map((n, i) => `L${i + 1}: ${"○".repeat(n)}`).join("&nbsp;&nbsp; ") + (D.pact ? `&nbsp;&nbsp; Pact (L${D.pact.lvl}): ${"○".repeat(D.pact.n)}` : "");
     spells += `<tr class="psec"><td colspan="3">Spells${casters ? `<div class="pcast">${casters}</div>` : ""}${slots ? `<div class="pcast">Slots — ${slots}</div>` : ""}</td></tr>`;
     for (const l of Object.keys(groups).sort((a, b) => (a === "?" ? 99 : a) - (b === "?" ? 99 : b))) {

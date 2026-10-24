@@ -622,3 +622,18 @@ CLASSES.artificer = {
 };
 POOLS.armorModel = { label: "Arcane Armor model", options: () => ["Dreadnaught", "Guardian", "Infiltrator"] };
 START_EQUIP.class.artificer = { A: ["Studded Leather Armor", "Dagger", "Thieves' Tools", "Tinker's Tools", "Dungeoneer's Pack", "16 GP"], B: ["150 GP"] };
+
+// Eldritch Invocation prerequisites (2024): [warlock level, other requirement]
+const INVOCATION_PREREQ = {
+  "Armor of Shadows": [1], "Eldritch Mind": [1], "Pact of the Blade": [1], "Pact of the Chain": [1], "Pact of the Tome": [1],
+  "Agonizing Blast": [2, "damage cantrip"], "Devil's Sight": [2], "Eldritch Spear": [2, "damage cantrip"],
+  "Fiendish Vigor": [2], "Lessons of the First Ones": [2], "Mask of Many Faces": [2], "Misty Visions": [2], "Otherworldly Leap": [2],
+  "Repelling Blast": [2, "attack cantrip"],
+  "Ascendant Step": [5], "Eldritch Smite": [5, "Pact of the Blade"], "Gaze of Two Minds": [5], "Gift of the Depths": [5],
+  "Investment of the Chain Master": [5, "Pact of the Chain"], "Master of Myriad Forms": [5], "One with Shadows": [5], "Thirsting Blade": [5, "Pact of the Blade"],
+  "Whispers of the Grave": [7],
+  "Gift of the Protectors": [9, "Pact of the Tome"], "Lifedrinker": [9, "Pact of the Blade"], "Visions of Distant Realms": [9],
+  "Devouring Blade": [12, "Thirsting Blade"],
+  "Witch Sight": [15]
+};
+POOLS.invocations.prereq = INVOCATION_PREREQ;

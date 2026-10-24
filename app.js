@@ -48,7 +48,7 @@ function buildIndex() {
     idx.spell[norm(s.name)] = s; idx.spellList.push(s);
   }
   idx.spellList.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
-  S.idx = idx;
+  S.idx = idx; idx.feats = null;
 }
 function findPage(cat, name, exclude, fuzzy) {
   const list = (S.idx.pages[cat] || []).filter(p => !exclude || !exclude(p));
@@ -78,6 +78,44 @@ function lookup(name, slugs = []) {
 function spellInfo(name) { return S.idx.spell[norm(name)] || null; }
 function classSlug(cls) { return S.wiki.pages[cls + ":main"] ? cls + ":main" : findPage(cls, CLASSES[cls].name); }
 function subclassSlug(cls, sub) { const sc = CLASSES[cls].subclasses[sub]; return sc ? findPage(cls, sc.name, p => p.slug.endsWith(":main"), true) : null; }
+
+// ---------- feat catalog: built-in feats + every feat page from the wiki ----------
+const FEAT_CATS = { origin: "Origin feats", general: "General feats", style: "Fighting Style feats", boon: "Epic Boon feats", other: "Other feats" };
+function parseFeatAbil(t) {
+  const m = String(t).match(/[^.\n]*(?:score[s]? by 1|by 1, to a maximum of)[^.\n]*/i); if (!m) return null;
+  const s = m[0].toLowerCase();
+  if (/one ability score of your choice|any ability|one of your ability scores/.test(s)) return ABILITIES.slice();
+  const out = ABILITIES.filter(a => s.includes(ABILITY_NAMES[a].toLowerCase()));
+  return out.length ? out : null;
+}
+function normSource(x) {
+  x = String(x).trim().replace(/\s*\(.*$/, "").replace(/[,;].*$/, "");
+  if (/^(phb|player'?s handbook|player’s handbook)( 2024)?$/i.test(x) || /player'?s handbook/i.test(x)) return "Player's Handbook";
+  if (/faer[uû]n|forgotten realms/i.test(x)) return "Heroes of Faerûn";
+  if (/eberron|artificer/i.test(x)) return "Eberron: Forge of the Artificer";
+  return x;
+}
+function featCatalog() {
+  if (S.idx.feats) return S.idx.feats;
+  const map = {};
+  for (const [n, fd] of Object.entries(FEATS)) map[norm(n)] = { name: n, cat: fd.cat, abil: fd.abil || null, source: "Player's Handbook", builtin: true };
+  for (const p of S.idx.pages.feat || []) {
+    if (/:all$/.test(p.slug) || /\ball\b/i.test(p.title)) continue;
+    const page = S.wiki.pages[p.slug]; const t = page.text || "";
+    const e = map[p.n] || (map[p.n] = { name: p.title, builtin: false });
+    e.slug = p.slug;
+    const catM = t.match(/\b(Origin|General|Fighting Style|Epic Boon)\s+Feat/i);
+    if (!e.builtin && catM) e.cat = { "origin": "origin", "general": "general", "fighting style": "style", "epic boon": "boon" }[catM[1].toLowerCase()];
+    if (!e.cat) e.cat = "other";
+    const srcM = t.match(/Source:\s*([^\n]+)/i); if (srcM) e.source = normSource(srcM[1]);
+    if (!e.abil) e.abil = parseFeatAbil(t);
+    const pre = t.match(/Prerequisite[s]?:\s*([^\n)]+)/i); if (pre) e.prereq = pre[1].trim();
+  }
+  for (const e of Object.values(map)) e.source = e.source || "Player's Handbook";
+  return S.idx.feats = map;
+}
+function featInfo(name) { return featCatalog()[norm(name)] || null; }
+function featDesc(name) { const fi = featInfo(name); return fi && fi.slug ? pageText(fi.slug) : lookup(name); }
 
 // ---------- character model ----------
 function newChar() {
@@ -150,7 +188,7 @@ function derive(c) {
     const a = lv.asi; if (!a) return;
     if (a.mode === "asi") { if (a.t === "11") { if (a.a1) bonus[a.a1] += 1; if (a.a2) bonus[a.a2] += 1; } else if (a.a1) bonus[a.a1] += 2; }
   });
-  D.feats.forEach(f => { const fd = FEATS[f.name]; if (fd && fd.abil && f.abil) { bonus[f.abil] += 1; if (fd.max30) max30[f.abil] = 1; } });
+  D.feats.forEach(f => { const fi = featInfo(f.name); if (fi && fi.abil && f.abil) { bonus[f.abil] += 1; if (fi.cat === "boon") max30[f.abil] = 1; } });
   D.bonus = bonus; D.score = {}; D.mod = {};
   ABILITIES.forEach(a => { D.score[a] = Math.min((+c.base[a] || 8) + bonus[a], max30[a] ? 30 : 20); D.mod[a] = modOf(D.score[a]); });
 
@@ -285,6 +323,10 @@ function derive(c) {
   D.slots = casterLevel ? SLOTS[Math.min(casterLevel, 20)] : [];
   if (D.cls.warlock) { const l = D.cls.warlock; D.pact = { n: at(CLASSES.warlock.pact.n, l), lvl: at(CLASSES.warlock.pact.lvl, l) }; }
 
+  if (sp && sp.spellAbility) {
+    const ab = c.species.spellAbil || ["cha", "wis", "int"].sort((a, b) => D.mod[b] - D.mod[a])[0];
+    D.speciesCast = { name: sp.name, ability: ab, dc: 8 + D.pb + D.mod[ab], atk: D.pb + D.mod[ab], chosen: !!c.species.spellAbil };
+  }
   // always-prepared spells
   D.alwaysSpells = [];
   for (const k in D.subs) {
@@ -388,9 +430,8 @@ function collectFeatures(c, D) {
   }
   // feats
   D.feats.forEach((f, i) => {
-    const slug = findPage("feat", f.name);
     let nm = f.name; if (f.picks?.list) nm += " (" + f.picks.list + ")"; if (f.picks?.type) nm += " (" + f.picks.type + ")";
-    add("feat:" + norm(f.name) + ":" + i, nm, f.src, slug ? pageText(slug) : lookup(f.name), { cat: "feat" });
+    add("feat:" + norm(f.name) + ":" + i, nm, f.src, featDesc(f.name), { cat: "feat" });
   });
   // classes
   for (const k in D.cls) {

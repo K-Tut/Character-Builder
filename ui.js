@@ -1,3 +1,4 @@
+const APP_VERSION = "2026-10-24";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -122,7 +123,8 @@ function renderHome() {
     <div class="row" style="margin-top:6px"><button class="ghost small" data-act="loadWikiFile">Load wiki.json file…</button>
       ${np ? `<button class="ghost small" data-act="wikiEncExport" title="Encrypted copy of the rules text to upload to your GitHub repo">🔒 Create wiki.enc for GitHub…</button>` : ""}</div>
     ${imp.error ? `<p class="warn">${esc(imp.error)}</p>` : ""}
-  </div>`;
+  </div>
+  <p class="small muted" style="text-align:center;margin:18px 0 30px">App version ${APP_VERSION} · <a href="#" data-act="updateApp">Check for updates</a></p>`;
 }
 async function pollImport() {
   const st = await (await fetch("api/import", { cache: "no-store" })).json(); S.ui.import = st;
@@ -173,29 +175,62 @@ function bSpecies(c, D) {
     <div class="small">${Object.values(s.traits).flat().join(", ")}</div></div>`).join("")}</div></div>`;
   if (!sp) return h;
   const slug = findPage("species", sp.name);
-  h += `<div class="card"><h3>${sp.name} options</h3><div class="row">`;
-  if (sp.choice) h += `<label>${sp.choice.label}: ${sel("species.choice", c.species.choice, sp.choice.opts, { blank: "— choose —" })}</label>`;
+  h += `<div class="card"><h3>${sp.name} options</h3>`;
+  if (sp.choice) h += lineageTable(c, sp, slug);
+  h += `<div class="row" style="margin-top:8px">`;
   if (sp.size.includes(" or ")) h += `<label>Size: ${sel("species.size", c.species.size || "Medium", sp.size.split(" or "))}</label>`;
   h += `</div>`;
   if (sp.pools) for (const pk in sp.pools) h += poolPicker(pk, D, c);
-  if (sp.extraOriginFeat) h += `<div style="margin-top:10px"><b>Versatile:</b> origin feat ${featSelect("speciesFeat", c.speciesFeat, ["origin"])}${featPicks("speciesFeat", c.speciesFeat, D)}</div>`;
-  if (sp.spellAbility) h += `<p class="small muted">Spells from your species use Int, Wis or Cha (your choice, set when you choose the lineage).</p>`;
+  if (sp.extraOriginFeat) h += `<div style="margin-top:10px"><b>Versatile:</b> choose an origin feat ${featSelect("speciesFeat", c.speciesFeat, ["origin"])}${featPicks("speciesFeat", c.speciesFeat, D)}</div>`;
+  if (sp.spellAbility) h += `<p><label><b>Spellcasting ability for these spells:</b> ${sel("species.spellAbil", c.species.spellAbil || "", [["int", "Intelligence"], ["wis", "Wisdom"], ["cha", "Charisma"]], { blank: "— choose —" })}</label>${D.speciesCast ? ` <span class="chip">Save DC ${D.speciesCast.dc} · Attack ${sgn(D.speciesCast.atk)}</span>` : ""}</p>`;
+  if (sp.spells) h += `<p class="small"><b>Always known:</b> ${Object.entries(sp.spells).map(([lv, l]) => l.map(n => spellLink(n) + (+lv > 1 ? ` (level ${lv}+)` : "")).join(", ")).join(", ")}</p>`;
+  if (S.ui.spellPeek) { const si = spellInfo(S.ui.spellPeek); h += `<div class="infobox"><div class="row"><b>${esc(S.ui.spellPeek)}</b>${si ? ` <span class="small muted">${si.level ? "Level " + si.level : "Cantrip"} ${esc(si.school)}</span>` : ""}<a href="#" class="right" data-act="spellPeek" data-v="">✕</a></div>${si ? `<div class="meta small">${esc([si.time && "Casting time: " + si.time, si.range && "Range: " + si.range, si.comp && "Components: " + si.comp, si.dur && "Duration: " + si.dur].filter(Boolean).join(" · "))}</div><div class="desc">${para(si.text)}</div>` : '<span class="muted small">Spell not in the imported rules text.</span>'}</div>`; }
   h += `</div><div class="card"><h3>Traits</h3>${Object.entries(sp.traits).map(([lv, ts]) => ts.map(t => `<details><summary><b>${t}</b>${+lv > 1 ? ` <span class="muted small">(level ${lv})</span>` : ""}</summary><div class="desc">${para(lookup(t, slug ? [slug] : [])) || '<span class="muted">No description imported.</span>'}</div></details>`).join("")).join("")}</div>`;
   return h;
 }
 
-function featLabel(n) { const fd = FEATS[n] || {}; return n + (fd.abil ? `  (+1 ${fd.abil.length === 6 ? "any" : fd.abil.map(a => ABBR[a]).join("/")})` : ""); }
-function featSelect(path, f, cats, attr = "") {
+function spellLink(n) { return `<a href="#" class="spl ${S.ui.spellPeek === n ? "on" : ""}" data-act="spellPeek" data-v="${esc(n)}">${esc(n)}</a>`; }
+function lineageTable(c, sp, slug) {
+  const ch = sp.choice, cur = c.species.choice;
+  if (sp.byChoice) {
+    const lv = [...new Set(Object.values(sp.byChoice).flatMap(o => Object.keys(o.spells || {})))].sort((a, b) => a - b);
+    return `<p style="margin:4px 0"><b>${esc(ch.label)}</b> <span class="small muted">— tap a row to choose; tap a spell to read it</span></p>
+      <div style="overflow-x:auto"><table class="lintable"><tr><th></th><th>${esc(ch.label.replace(/^(Elven|Gnomish|Fiendish) /, ""))}</th>${lv.map(l => `<th>Level ${l}</th>`).join("")}<th>Also</th></tr>
+      ${ch.opts.map(o => { const x = sp.byChoice[o] || {}; const extra = [x.darkvision && `Darkvision ${x.darkvision} ft`, x.speed && `Speed ${x.speed} ft`, x.resist && `Resistance: ${x.resist.join(", ")}`].filter(Boolean).join("; ");
+        return `<tr class="${cur === o ? "on" : ""}" data-act="setLineageRow" data-v="${esc(o)}" style="cursor:pointer"><td><input type="radio" name="lin" data-act="setLineage" value="${esc(o)}" ${cur === o ? "checked" : ""}></td><td><b>${esc(o)}</b></td>${lv.map(l => `<td>${((x.spells || {})[l] || []).map(spellLink).join(", ") || "—"}</td>`).join("")}<td class="small">${esc(extra) || "—"}</td></tr>`; }).join("")}
+      </table></div>`;
+  }
+  const open = S.ui.linInfo;
+  return `<p style="margin:4px 0"><b>${esc(ch.label)}</b></p>${ch.opts.map(o => `<div class="fprow ${cur === o ? "on" : ""}"><label><input type="radio" name="lin" data-act="setLineage" value="${esc(o)}" ${cur === o ? "checked" : ""}> <b>${esc(o)}</b></label>
+    <a href="#" class="info ${open === o ? "on" : ""}" data-act="linInfo" data-v="${esc(o)}">ⓘ</a>${open === o ? `<div class="infobox" style="width:100%"><div class="desc">${para(lookup(o.replace(/\s*\(.*\)$/, ""), slug ? [slug] : [])) || '<span class="muted">No description imported.</span>'}</div></div>` : ""}</div>`).join("")}`;
+}
+function abilTag(abil) { return abil ? `+1 ${abil.length === 6 ? "any" : abil.map(a => ABBR[a]).join("/")}` : ""; }
+function featLabel(n) { const fi = featInfo(n); return n + (fi && fi.abil ? `  (${abilTag(fi.abil)})` : ""); }
+// clickable feat list (like the invocation picker): groups by category and source book, ⓘ for details
+function featSelect(path, f, cats) {
   const flt = S.ui.featFilter || "";
+  const cat = featCatalog();
   const canFilter = cats.some(x => x === "general" || x === "boon");
-  const ok = ([n, fd]) => cats.includes(fd.cat) && (!canFilter || !flt || f?.name === n || (fd.abil || []).includes(flt) || (fd.asi && flt));
-  const groups = [["origin", "Origin feats"], ["general", "General feats"], ["style", "Fighting style feats"], ["boon", "Epic boons"]];
-  const list = Object.entries(FEATS).filter(ok);
-  const sel = `<select data-act="setFeat" data-p="${path}" ${attr}><option value="">— choose feat —</option>${groups.filter(g => cats.includes(g[0])).map(([g, l]) => {
-    const o = list.filter(([n, fd]) => fd.cat === g); return o.length ? `<optgroup label="${l}">${o.map(([n]) => `<option value="${esc(n)}" ${f?.name === n ? "selected" : ""}>${esc(featLabel(n))}</option>`).join("")}</optgroup>` : "";
-  }).join("")}</select>`;
-  const filter = canFilter ? `<select data-act="featFilter" title="Show only feats that raise this ability"><option value="">All feats</option>${ABILITIES.map(a => `<option value="${a}" ${flt === a ? "selected" : ""}>Raises ${ABILITY_NAMES[a]}</option>`).join("")}</select> ` : "";
-  return filter + sel;
+  const id = path.replace(/[^\w]/g, "_");
+  const all = Object.values(cat).filter(e => cats.includes(e.cat)).filter(e => !canFilter || !flt || f?.name === e.name || (e.abil || []).includes(flt) || (FEATS[e.name]?.asi && flt));
+  const open = S.ui.featInfo === id ? S.ui.featInfoName : null;
+  let h = `<div class="featpick">`;
+  if (f?.name) h += `<div class="row"><b>Chosen:</b> <span class="chip acc">${esc(f.name)}</span>${path !== "__bg" ? `<a href="#" class="small" data-act="pickFeat" data-p="${esc(path)}" data-v="">clear</a>` : ""}</div>`;
+  if (canFilter) h += `<div class="row small" style="margin:6px 0"><span class="muted">Raises:</span>${["", ...ABILITIES].map(a => `<span class="chip ${flt === a ? "acc" : ""}" style="cursor:pointer" data-act="featFilterChip" data-a="${a}">${a ? ABBR[a] : "Any"}</span>`).join("")}</div>`;
+  h += `<div class="featlist">`;
+  for (const c of cats) {
+    const inCat = all.filter(e => e.cat === c); if (!inCat.length) continue;
+    const bySrc = {}; inCat.forEach(e => (bySrc[e.source] ||= []).push(e));
+    const srcs = Object.keys(bySrc).sort((a, b) => (a === "Player's Handbook" ? -1 : b === "Player's Handbook" ? 1 : a.localeCompare(b)));
+    for (const src of srcs) {
+      h += `<div class="fphead">${esc(FEAT_CATS[c] || c)}${srcs.length > 1 || src !== "Player's Handbook" ? ` <span class="muted">· ${esc(src)}</span>` : ""}</div>`;
+      h += bySrc[src].sort((a, b) => a.name.localeCompare(b.name)).map(e => `<div class="fprow ${f?.name === e.name ? "on" : ""}">
+        <label><input type="radio" name="fp_${id}" data-act="pickFeat" data-p="${esc(path)}" data-v="${esc(e.name)}" ${f?.name === e.name ? "checked" : ""}> <b>${esc(e.name)}</b>${e.abil ? ` <span class="small muted">${abilTag(e.abil)}</span>` : ""}${e.prereq ? ` <span class="small muted">· ${esc(e.prereq)}</span>` : ""}</label>
+        <a href="#" class="info ${open === e.name ? "on" : ""}" data-act="featInfoTog" data-id="${id}" data-v="${esc(e.name)}">ⓘ</a>
+        ${open === e.name ? `<div class="infobox" style="width:100%"><div class="desc">${para(featDesc(e.name)) || '<span class="muted">No description imported.</span>'}</div></div>` : ""}</div>`).join("");
+    }
+  }
+  return h + `</div></div>`;
 }
 function pickOpts(spec, D) {
   if (Array.isArray(spec)) return spec;
@@ -206,7 +241,7 @@ function pickOpts(spec, D) {
 }
 function featPicks(path, f, D) {
   if (!f || !f.name) return "";
-  const fd = FEATS[f.name] || {}; let h = `<div class="row" style="margin-top:6px">`;
+  const fd = { ...(FEATS[f.name] || {}), abil: featInfo(f.name)?.abil || FEATS[f.name]?.abil }; let h = `<div class="row" style="margin-top:6px">`;
   if (fd.abil) h += `<label>+1 to ${sel(path + ".abil", f.abil, fd.abil.map(a => [a, ABILITY_NAMES[a]]), { blank: "— ability —" })}</label>`;
   for (const p of fd.picks || []) {
     if (path === "bgFeat" && p.key === "list" && f.presetList) continue;
@@ -237,7 +272,15 @@ function poolPicker(pk, D, c, oldMax) {
   const info = POOLS_WITH_INFO.has(pk);
   const open = S.ui.optInfo && S.ui.optInfo.pk === pk ? S.ui.optInfo.o : null;
   return `<div style="margin:10px 0"><b>${esc(poolLabel(pk))}</b> <span class="chip ${cur.length < p.max ? "acc" : ""}">${Math.min(cur.length, p.max)} / ${p.max}${oldMax !== undefined && p.max > oldMax ? ` (+${p.max - oldMax} new)` : ""}</span>${info ? ' <span class="small muted">tap ⓘ to read</span>' : ""}
-  <div class="checks">${opts.map(o => `<label class="${taken.has(o) ? "muted" : ""}"><input type="checkbox" data-act="pool" data-k="${esc(pk)}" data-v="${esc(o)}" ${cur.includes(o) ? "checked" : ""} ${!cur.includes(o) && (cur.length >= p.max || taken.has(o)) ? "disabled" : ""}>${esc(o)}${taken.has(o) ? " ✓" : ""}${info ? ` <a href="#" class="info ${open === o ? "on" : ""}" data-act="optInfo" data-k="${esc(pk)}" data-v="${esc(o)}">ⓘ</a>` : ""}</label>`).join("")}</div>
+  ${(() => {
+    const pre = POOLS[pk]?.prereq;
+    const box = (o, lock, hint) => `<label class="${taken.has(o) || lock ? "muted" : ""}"><input type="checkbox" data-act="pool" data-k="${esc(pk)}" data-v="${esc(o)}" ${cur.includes(o) ? "checked" : ""} ${!cur.includes(o) && (cur.length >= p.max || taken.has(o) || lock) ? "disabled" : ""}>${esc(o)}${taken.has(o) ? " ✓" : ""}${hint ? ` <span class="small muted">(${esc(hint)})</span>` : ""}${info ? ` <a href="#" class="info ${open === o ? "on" : ""}" data-act="optInfo" data-k="${esc(pk)}" data-v="${esc(o)}">ⓘ</a>` : ""}</label>`;
+    if (!pre) return `<div class="checks">${opts.map(o => box(o)).join("")}</div>`;
+    const lvl = D.cls.warlock || 0, groups = {};
+    opts.forEach(o => { const l = (pre[o] || [1])[0]; (groups[l] ||= []).push(o); });
+    return Object.keys(groups).sort((a, b) => a - b).map(l => `<div class="pgrp">${+l === 1 ? "No level prerequisite" : "Warlock level " + l + "+"}${lvl < +l ? ` <span class="muted" style="text-transform:none;font-weight:600">— unlocks at level ${l}</span>` : ""}</div>
+      <div class="checks">${groups[l].map(o => box(o, lvl < +l && !cur.includes(o), (pre[o] || [])[1] ? "needs " + pre[o][1] : "")).join("")}</div>`).join("");
+  })()}
   ${open ? `<div class="infobox"><div class="row"><b>${esc(open)}</b><a href="#" class="right" data-act="optInfo" data-k="${esc(pk)}" data-v="">✕</a></div><div class="desc">${para(optionText(pk, open)) || '<span class="muted">No description found in the imported rules text.</span>'}</div></div>` : ""}</div>`;
 }
 
@@ -268,10 +311,11 @@ function bBackground(c, D) {
    <p><b>Skills:</b> ${bg.custom ? `<span class="chip ${bg.skills.length < 2 ? "acc" : ""}">${bg.skills.length}/2</span>` : bg.skills.join(", ")}</p>
    ${bg.custom ? `<div class="checks">${ALL_SKILLS.map(s => `<label><input type="checkbox" data-act="bgSkill" data-v="${s}" ${bg.skills.includes(s) ? "checked" : ""} ${!bg.skills.includes(s) && bg.skills.length >= 2 ? "disabled" : ""}>${s}</label>`).join("")}</div>` : ""}
    <p><b>Tool proficiency:</b> ${bg.custom ? sel("background.tool", b.tool, TOOLS, { blank: "— choose a tool —" }) : BACKGROUNDS[b.id].tool.startsWith("One") ? inp("background.tool", b.tool, { ph: BACKGROUNDS[b.id].tool }) : bg.tool}</p>
+   ${!bg.custom && START_EQUIP.background[b.id] ? `<p style="margin-bottom:4px"><b>Equipment</b> <span class="small muted">— pick one; it's added to your equipment</span></p>${equipOptions(c, D, "bg")}` : ""}
    <p><b>Origin feat:</b> ${bg.custom ? "" : `${esc(bg.origFeat)} <label class="small" style="margin-left:10px"><input type="checkbox" data-act="bgFeatSwap" ${bg.featChanged ? "checked" : ""}> choose a different origin feat</label>`}</p>
-   ${bg.custom || bg.featChanged ? `<p><select data-act="setBgFeat"><option value="">— choose origin feat —</option>${origins.map(n => `<option ${b.featOverride === n ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></p>` : ""}
+   ${bg.custom || bg.featChanged ? featSelect("__bg", { name: b.featOverride }, ["origin"]) : ""}
    ${featName ? featPicks("bgFeat", { name: featName, ...c.bgFeat, presetList }, D) : ""}
-   ${featName ? `<details style="margin-top:8px"><summary>Feat description</summary><div class="desc">${para(pageText(findPage("feat", featName)) || lookup(featName)) || '<span class="muted">Not imported.</span>'}</div></details>` : ""}
+   ${featName ? `<details style="margin-top:8px"><summary>Feat description</summary><div class="desc">${para(featDesc(featName)) || '<span class="muted">Not imported.</span>'}</div></details>` : ""}
    ${bg.custom ? "" : `<details><summary>Background description</summary><div class="desc">${para(pageText(findPage("background", bg.name))) || '<span class="muted">Not imported.</span>'}</div></details>`}
   </div>`;
   return h;
@@ -318,10 +362,9 @@ function asiEditor(path, a, D, boon) {
   if (a.mode === "asi") {
     h += `<div class="row" style="margin-top:4px">${sel(path + ".t", a.t || "2", [["2", "+2 to one"], ["11", "+1 to two"]])} ${sel(path + ".a1", a.a1, ab, { blank: "—" })} ${a.t === "11" ? sel(path + ".a2", a.a2, ab.filter(x => x[0] !== a.a1), { blank: "—" }) : ""}</div>`;
   } else if (a.mode === "feat") {
-    const cats = boon ? ["boon", "general", "origin"] : ["general", "origin"];
+    const cats = boon ? ["boon", "general", "origin", "other"] : ["general", "origin", "other"];
     if (D.pools.fightingStyle) cats.push("style");
     h += `<div style="margin-top:4px">${featSelect(path + ".feat", a.feat, cats)}${featPicks(path + ".feat", a.feat, D)}</div>`;
-    if (a.feat?.name) { const s = findPage("feat", a.feat.name); h += `<details><summary class="small">Description</summary><div class="desc">${para(s ? pageText(s) : lookup(a.feat.name)) || '<span class="muted">Not imported.</span>'}</div></details>`; }
   }
   return h + `</div>`;
 }
@@ -407,29 +450,43 @@ function armorSelect(c, D) {
       `<option value="${id}" ${c.armor === id ? "selected" : ""}>${a.name} — AC ${a.base}${k === "light" ? "+Dex" : k === "medium" ? "+Dex(2)" : ""}${a.str ? " · Str " + a.str : ""}${a.stealth ? " · Stealth dis." : ""}</option>`).join("")}</optgroup>`;
   }).join("")}</select>`;
 }
-function startEquipCard(c, D) {
-  const cls = D.startCls, bg = c.background.id;
-  const ce = cls ? START_EQUIP.class[cls] : null, be = START_EQUIP.background[bg];
-  if (!ce && !be) return `<div class="card"><h3>Starting equipment</h3><p class="muted small">Choose a class and background first.</p></div>`;
-  const se = S.ui.se ||= {}; se.c ||= "A"; se.b ||= "A";
+function equipOptions(c, D, which) {
+  // which: "class" | "bg"
   const line = l => l.map(esc).join(", ");
-  return `<div class="card"><h3>Starting equipment</h3>
-    ${ce ? `<p><b>${CLASSES[cls].name}</b> — choose one:</p>${Object.entries(ce).map(([k, l]) => `<label style="display:block;margin:3px 0"><input type="radio" name="sec" data-act="seOpt" data-w="c" value="${k}" ${se.c === k ? "checked" : ""}> <b>${k}:</b> ${line(l)}</label>`).join("")}` : ""}
-    ${be ? `<p style="margin-top:8px"><b>${BACKGROUNDS[bg].name}</b> — choose one:</p>
-      <label style="display:block;margin:3px 0"><input type="radio" name="seb" data-act="seOpt" data-w="b" value="A" ${se.b === "A" ? "checked" : ""}> <b>A:</b> ${line(be)}</label>
-      <label style="display:block;margin:3px 0"><input type="radio" name="seb" data-act="seOpt" data-w="b" value="B" ${se.b === "B" ? "checked" : ""}> <b>B:</b> ${START_EQUIP.backgroundGold} GP</label>` : ""}
-    <div class="row" style="margin-top:8px"><button data-act="applyStartEquip">Add to my equipment</button>${c.startEquipDone ? '<span class="small muted">Already added once — adding again duplicates items.</span>' : '<span class="small muted">Weapons go to Attacks, armor/shield are equipped, gold goes to Coins.</span>'}</div></div>`;
+  const cur = (c.startEquip || {})[which] || "";
+  const name = which === "class" ? "sec" : "seb";
+  let opts;
+  if (which === "class") { const ce = D.startCls ? START_EQUIP.class[D.startCls] : null; if (!ce) return ""; opts = Object.entries(ce); }
+  else { const be = START_EQUIP.background[c.background.id]; if (!be) return ""; opts = [["A", be], ["B", [START_EQUIP.backgroundGold + " GP"]]]; }
+  return opts.map(([k, l]) => `<label class="eqopt ${cur === k ? "on" : ""}"><input type="radio" name="${name}" data-act="seOpt" data-w="${which}" value="${k}" ${cur === k ? "checked" : ""}> <b>${k}:</b> ${line(l)}</label>`).join("")
+    + `<label class="eqopt ${!cur ? "on" : ""}"><input type="radio" name="${name}" data-act="seOpt" data-w="${which}" value="" ${!cur ? "checked" : ""}> <span class="muted">None (I'll add equipment myself)</span></label>`;
 }
-function applyStartEquip(c, list) {
-  for (const raw of list) {
-    let m = raw.match(/^(\d+)\s*GP$/i); if (m) { c.coins.gp = (+c.coins.gp || 0) + +m[1]; continue; }
+function startEquipCard(c, D) {
+  const ce = D.startCls ? START_EQUIP.class[D.startCls] : null, be = START_EQUIP.background[c.background.id];
+  if (!ce && !be) return `<div class="card"><h3>Starting equipment</h3><p class="muted small">Choose a class and background first.</p></div>`;
+  return `<div class="card"><h3>Starting equipment</h3><p class="small muted">Pick an option — its contents are added to your weapons, armor, items and coins right away. Switching swaps them out.</p>
+    ${ce ? `<p><b>${CLASSES[D.startCls].name}</b></p>${equipOptions(c, D, "class")}` : ""}
+    ${be ? `<p style="margin-top:8px"><b>${esc(BACKGROUNDS[c.background.id].name)}</b></p>${equipOptions(c, D, "bg")}` : ""}</div>`;
+}
+// add an equipment option; everything added is tagged with its source so switching options removes it again
+function applyStartEquip(c, list, src) {
+  c.startEquip ||= {}; c.startGold ||= {};
+  if (src) {
+    c.weapons = c.weapons.filter(w => w.src !== src);
+    c.items = c.items.filter(it => it.src !== src);
+    c.coins.gp = Math.max(0, (+c.coins.gp || 0) - (c.startGold[src] || 0)); c.startGold[src] = 0;
+    if (c.armorSrc === src) { c.armor = ""; c.armorSrc = ""; }
+    if (c.shieldSrc === src) { c.shield = false; c.shieldSrc = ""; }
+  }
+  for (const raw of list || []) {
+    let m = raw.match(/^(\d+)\s*GP$/i); if (m) { c.coins.gp = (+c.coins.gp || 0) + +m[1]; if (src) c.startGold[src] += +m[1]; continue; }
     m = raw.match(/^(\d+)\s+(.*)$/); const qty = m ? +m[1] : 1; const name = m ? m[2] : raw;
     const w = WEAPONS.find(x => x.name.toLowerCase() === name.toLowerCase());
-    if (w) { c.weapons.push({ name: w.name, base: w.name, magic: 0, notes: qty > 1 ? "×" + qty : "" }); continue; }
+    if (w) { c.weapons.push({ name: w.name, base: w.name, magic: 0, notes: qty > 1 ? "×" + qty : "", src }); continue; }
     const ak = Object.keys(ARMOR).find(k => k && ARMOR[k].name.toLowerCase() === name.toLowerCase());
-    if (ak) { c.armor = ak; continue; }
-    if (/^shield$/i.test(name)) { c.shield = true; continue; }
-    c.items.push({ name, qty, note: "" });
+    if (ak) { c.armor = ak; c.armorSrc = src; continue; }
+    if (/^shield$/i.test(name)) { c.shield = true; c.shieldSrc = src; continue; }
+    c.items.push({ name, qty, note: "", src });
   }
 }
 

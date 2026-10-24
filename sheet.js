@@ -85,7 +85,8 @@ function sheetSpells(c, D) {
   const add = (name, src, always, lvlHint) => { const si = spellInfo(name); const l = si?.level ?? lvlHint ?? "?"; (groups[l] ||= []).push({ name, src, always, si }); };
   D.alwaysSpells.forEach(s => add(s.name, s.src, true));
   c.spells.forEach(s => add(s.name, s.cls === "other" ? "Other" : CLASSES[s.cls]?.name || s.cls, false, s.level));
-  let h = D.casters.map(cs => `<span class="chip acc roll" ${R(cs.name + " spell attack", cs.atk)}>${cs.name}: DC ${cs.dc} · Atk ${sgn(cs.atk)} 🎲</span>`).join("") + `<button class="small ghost" data-act="goSpells" style="margin-left:6px">Change spells</button>`;
+  let h = D.casters.map(cs => `<span class="chip acc roll" ${R(cs.name + " spell attack", cs.atk)}>${cs.name}: DC ${cs.dc} · Atk ${sgn(cs.atk)} 🎲</span>`).join("")
+    + (D.speciesCast && D.alwaysSpells.some(s => s.cls === "species") ? `<span class="chip acc roll" ${R(D.speciesCast.name + " spell attack", D.speciesCast.atk)}>${esc(D.speciesCast.name)} spells: DC ${D.speciesCast.dc} · Atk ${sgn(D.speciesCast.atk)} (${ABBR[D.speciesCast.ability]}) 🎲</span>` : "") + `<button class="small ghost" data-act="goSpells" style="margin-left:6px">Change spells</button>`;
   if (!Object.keys(groups).length) return h + `<p class="muted">No spells.</p>`;
   for (const l of Object.keys(groups).sort((a, b) => (a === "?" ? 99 : a) - (b === "?" ? 99 : b))) {
     const slotN = +l ? (D.slots[l - 1] || 0) : 0;
@@ -184,6 +185,10 @@ function mShortRest() {
    <div class="foot"><button class="ghost" data-act="modalClose">Cancel</button><button data-act="srFinish">Finish short rest</button></div>`;
 }
 
+function applyFeatPick(p, v) {
+  if (p === "__bg") { S.char.background.featOverride = v; S.char.bgFeat = { picks: {} }; return; }
+  setPath(target(), p, v ? { name: v, picks: {} } : null);
+}
 // ---------- EVENTS ----------
 const ACT = {
   home: async () => { save(true); S.view = "home"; S.char = null; await loadChars(); render(); },
@@ -228,7 +233,7 @@ const ACT = {
   },
   deleteChar: async () => { if (!confirm("Delete " + S.char.name + " on all devices?")) return; await storeDeleteChar(S.char.id); S.char = null; S.view = "home"; await loadChars(); render(); },
   setSpecies: el => { const c = S.char; if (c.species.id !== el.dataset.id) { c.species = { id: el.dataset.id, choice: "", size: "" }; delete c.pools.keenSenses; delete c.pools.skillful; } save(); render(); },
-  setBg: el => { const c = S.char; if (c.background.id !== el.dataset.id) { c.background = { id: el.dataset.id, mode: "21", plus2: "", plus1: "", tool: "", skills: [], p111: [] }; c.bgFeat = { picks: {} }; } save(); render(); },
+  setBg: el => { const c = S.char; if (c.background.id !== el.dataset.id) { applyStartEquip(c, [], "bg"); (c.startEquip ||= {}).bg = ""; c.background = { id: el.dataset.id, mode: "21", plus2: "", plus1: "", tool: "", skills: [], p111: [] }; c.bgFeat = { picks: {} }; } save(); render(); },
   pbm: el => { const a = el.dataset.a; S.char.base[a] = Math.max(8, Math.min(15, S.char.base[a] + +el.dataset.d)); save(); render(); },
   stdArray: () => { const D = derive(S.char); const order = [...ABILITIES].sort((a, b) => (D.startCls && CLASSES[D.startCls].primary.includes(b) ? 1 : 0) - (D.startCls && CLASSES[D.startCls].primary.includes(a) ? 1 : 0)); [15, 14, 13, 12, 10, 8].forEach((v, i) => S.char.base[order[i]] = v); save(); render(); },
   levelup: () => startLevelUp(),
@@ -301,16 +306,22 @@ const ACT = {
   },
   featReset: () => { const m = S.char.featureMeta[S.modal.key]; if (m) delete m.text; closeModal(); save(); render(); },
   printNow: () => window.print(),
+  spellPeek: el => { S.ui.spellPeek = el.dataset.v && S.ui.spellPeek !== el.dataset.v ? el.dataset.v : null; render(); },
+  setLineageRow: el => { S.char.species.choice = el.dataset.v; save(); render(); },
+  linInfo: el => { S.ui.linInfo = S.ui.linInfo === el.dataset.v ? null : el.dataset.v; render(); },
+  pickFeat: el => { applyFeatPick(el.dataset.p, el.dataset.v); if (!S.draft) save(); S.modal ? renderModal() : render(); },
+  featFilterChip: el => { S.ui.featFilter = el.dataset.a; S.modal ? renderModal() : render(); },
+  featInfoTog: el => { const same = S.ui.featInfo === el.dataset.id && S.ui.featInfoName === el.dataset.v; S.ui.featInfo = same ? null : el.dataset.id; S.ui.featInfoName = same ? null : el.dataset.v; S.modal ? renderModal() : render(); },
+  updateApp: async () => {
+    toast("Checking for updates…");
+    try { if (S.swReg) await S.swReg.update(); } catch (e) { }
+    // fetch fresh copies of all files into the browser cache, then reload
+    try { await Promise.all(["index.html", "rules.js", "app.js", "store.js", "ui.js", "print.js", "sheet.js", "dice.js", "style.css", "print.css", "config.js", "sw.js"].map(f => fetch(f, { cache: "reload" }))); } catch (e) { }
+    location.reload();
+  },
   bgFilter: el => { S.ui.bgFilter = el.dataset.a; render(); },
   optInfo: el => { const o = el.dataset.v; S.ui.optInfo = o && !(S.ui.optInfo && S.ui.optInfo.pk === el.dataset.k && S.ui.optInfo.o === o) ? { pk: el.dataset.k, o } : null; S.modal ? renderModal() : render(); },
-  applyStartEquip: () => {
-    const c = S.char, D = derive(c), se = S.ui.se || { c: "A", b: "A" };
-    if (c.startEquipDone && !confirm("Starting equipment was already added. Add it again?")) return;
-    const ce = D.startCls ? START_EQUIP.class[D.startCls] : null, be = START_EQUIP.background[c.background.id];
-    if (ce) applyStartEquip(c, ce[se.c] || ce.A);
-    if (be) applyStartEquip(c, se.b === "B" ? [START_EQUIP.backgroundGold + " GP"] : be);
-    c.startEquipDone = true; save(); render(); toast("Starting equipment added");
-  },
+
   wikiUnlock: async () => {
     const pw = $("#wikiPw").value; if (!pw) return toast("Enter the password");
     try { toast("Unlocking…"); await WikiLock.unlock(pw, $("#wikiPwRem").checked); render(); toast("Rules text unlocked"); }
@@ -349,11 +360,18 @@ const CHG = {
   luHp: () => { const lv = S.draft.levels[S.draft.levels.length - 1]; lv.hp = null; },
   ds: el => { const P = S.char.play; const k = el.dataset.k, i = +el.dataset.i; P.ds[k] = el.checked ? i + 1 : i; },
   showHidden: el => { S.ui.showHidden = el.checked; },
+  pickFeat: el => applyFeatPick(el.dataset.p, el.dataset.v),
+  setLineage: el => { S.char.species.choice = el.value; },
   bgSkill: el => { const b = S.char.background; const a = b.skills ||= []; const v = el.dataset.v; const i = a.indexOf(v); if (i >= 0) a.splice(i, 1); else if (a.length < 2) a.push(v); },
   bgFeatSwap: el => { const b = S.char.background; b.swapFeat = el.checked; b.featOverride = ""; S.char.bgFeat = { picks: {} }; },
   setBgFeat: el => { S.char.background.featOverride = el.value; S.char.bgFeat = { picks: {} }; },
   featFilter: el => { S.ui.featFilter = el.value; },
-  seOpt: el => { (S.ui.se ||= { c: "A", b: "A" })[el.dataset.w] = el.value; },
+  seOpt: el => {
+    const c = S.char, D = derive(c), w = el.dataset.w, k = el.value;
+    const list = !k ? [] : w === "class" ? (START_EQUIP.class[D.startCls] || {})[k] : k === "B" ? [START_EQUIP.backgroundGold + " GP"] : START_EQUIP.background[c.background.id];
+    applyStartEquip(c, list, w); (c.startEquip ||= {})[w] = k;
+    toast(k ? "Equipment option " + k + " added" : "Starting equipment removed");
+  },
   popt: el => { const o = S.ui.print; o[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value; }
 };
 
@@ -399,5 +417,10 @@ $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && 
   Sync.loadToken();
   render(); renderSyncChip();
   if (Sync.enabled()) Sync.run();
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => { });
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    // reload once when a new version of the app takes over, so the phone never keeps running old code
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (!reloaded) { reloaded = true; location.reload(); } });
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(reg => { S.swReg = reg; reg.update().catch(() => { }); }).catch(() => { });
+  }
 })();
