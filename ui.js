@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-10-24";
+const APP_VERSION = "2026-10-25";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -49,7 +49,16 @@ async function openChar(id, view) {
   migrate(S.char);
   S.view = view || (S.char.levels.length ? "sheet" : "builder"); S.tab = "basics"; S.mtab = "combat"; render();
 }
-function migrate(c) { const d = newChar(); for (const k in d) if (c[k] === undefined) c[k] = d[k]; for (const k in d.play) if (c.play[k] === undefined) c.play[k] = d.play[k]; }
+function migrate(c) {
+  const d = newChar(); for (const k in d) if (c[k] === undefined) c[k] = d[k]; for (const k in d.play) if (c.play[k] === undefined) c.play[k] = d.play[k];
+  if (c.langExtra === undefined) {   // old free-text languages -> standard picks + extras
+    const parts = String(c.languages || "").split(/[,;]/).map(x => x.trim()).filter(x => x && !/^common$/i.test(x));
+    const std = parts.filter(p => LANG_STANDARD.some(l => l.toLowerCase() === p.toLowerCase())).slice(0, 2);
+    c.pools ||= {}; if (!c.pools.langOrigin) c.pools.langOrigin = std;
+    c.langExtra = parts.filter(p => !std.includes(p)).join(", ");
+  }
+  c.optChoices ||= {};
+}
 
 // ---------- images ----------
 function pickImage(cb, maxSize = 900) {
@@ -71,7 +80,13 @@ function pickImage(cb, maxSize = 900) {
 }
 
 // ---------- render dispatch ----------
-function render() {
+function keepScroll(fn) {
+  const m = {}; document.querySelectorAll("[data-sk]").forEach(e => m[e.dataset.sk] = e.scrollTop);
+  fn();
+  document.querySelectorAll("[data-sk]").forEach(e => { if (m[e.dataset.sk] != null) e.scrollTop = m[e.dataset.sk]; });
+}
+function render() { keepScroll(renderInner); }
+function renderInner() {
   const nav = $("#topnav");
   if (S.char && S.view !== "home") {
     nav.innerHTML = [["builder", "✎ Build"], ["sheet", "▶ Play"], ["print", "⎙ Print/PDF"]].map(([v, l]) => `<button class="${S.view === v ? "on" : ""}" data-act="view" data-v="${v}">${l}</button>`).join("") + `<span class="muted small navname" style="align-self:center;margin-left:8px">${esc(S.char.name)}</span>`;
@@ -148,7 +163,7 @@ function renderBuilder() {
   ${i < TABS.length - 1 ? `<button class="right" data-act="tab" data-t="${TABS[i + 1][0]}">${TABS[i + 1][1]} →</button>` : `<button class="right" data-act="view" data-v="sheet">Done → Play sheet</button>`}</div>`;
 }
 
-function bBasics(c) {
+function bBasics(c, D) {
   const ph = c.phys;
   return `<div class="grid g2">
   <div class="card"><h3>Identity</h3>
@@ -156,8 +171,9 @@ function bBasics(c) {
     <h3 style="margin-top:14px">Physical</h3>
     <div class="grid g3">${[["age", "Age"], ["height", "Height"], ["weight", "Weight"], ["eyes", "Eyes"], ["hair", "Hair"], ["skin", "Skin"], ["alignment", "Alignment"]].map(([k, l]) => `<label>${l}<br>${inp("phys." + k, ph[k], { style: "width:100%" })}</label>`).join("")}</div>
     <h3 style="margin-top:14px">Languages</h3>
-    ${inp("languages", c.languages, { style: "width:100%", ph: "Common, Elvish, ..." })}
-    <p class="small muted">2024: Common + two standard languages (${LANGUAGES.slice(1, 10).join(", ")}).</p>
+    <p style="margin:4px 0">You know: <b>${esc((D.languages || ["Common"]).join(", "))}</b></p>
+    ${poolPicker("langOrigin", D, c)}
+    <label class="small">Other languages (from your DM, feats, items…)<br>${inp("langExtra", c.langExtra || "", { style: "width:100%", ph: "e.g. Sylvan, Infernal" })}</label>
     <label>Other proficiencies / notes<br>${inp("otherProfs", c.otherProfs, { style: "width:100%" })}</label>
   </div>
   <div class="card"><h3>Character image</h3>
@@ -217,7 +233,7 @@ function featSelect(path, f, cats) {
   let h = `<div class="featpick">`;
   if (f?.name) h += `<div class="row"><b>Chosen:</b> <span class="chip acc">${esc(f.name)}</span>${path !== "__bg" ? `<a href="#" class="small" data-act="pickFeat" data-p="${esc(path)}" data-v="">clear</a>` : ""}</div>`;
   if (canFilter) h += `<div class="row small" style="margin:6px 0"><span class="muted">Raises:</span>${["", ...ABILITIES].map(a => `<span class="chip ${flt === a ? "acc" : ""}" style="cursor:pointer" data-act="featFilterChip" data-a="${a}">${a ? ABBR[a] : "Any"}</span>`).join("")}</div>`;
-  h += `<div class="featlist">`;
+  h += `<div class="featlist" data-sk="fl-${id}">`;
   for (const c of cats) {
     const inCat = all.filter(e => e.cat === c); if (!inCat.length) continue;
     const bySrc = {}; inCat.forEach(e => (bySrc[e.source] ||= []).push(e));
@@ -226,7 +242,7 @@ function featSelect(path, f, cats) {
       h += `<div class="fphead">${esc(FEAT_CATS[c] || c)}${srcs.length > 1 || src !== "Player's Handbook" ? ` <span class="muted">· ${esc(src)}</span>` : ""}</div>`;
       h += bySrc[src].sort((a, b) => a.name.localeCompare(b.name)).map(e => `<div class="fprow ${f?.name === e.name ? "on" : ""}">
         <label><input type="radio" name="fp_${id}" data-act="pickFeat" data-p="${esc(path)}" data-v="${esc(e.name)}" ${f?.name === e.name ? "checked" : ""}> <b>${esc(e.name)}</b>${e.abil ? ` <span class="small muted">${abilTag(e.abil)}</span>` : ""}${e.prereq ? ` <span class="small muted">· ${esc(e.prereq)}</span>` : ""}</label>
-        <a href="#" class="info ${open === e.name ? "on" : ""}" data-act="featInfoTog" data-id="${id}" data-v="${esc(e.name)}">ⓘ</a>
+        <a href="#" class="opttog" data-act="featInfoTog" data-id="${id}" data-v="${esc(e.name)}">${open === e.name ? "▾ hide" : "▸ details"}</a>
         ${open === e.name ? `<div class="infobox" style="width:100%"><div class="desc">${para(featDesc(e.name)) || '<span class="muted">No description imported.</span>'}</div></div>` : ""}</div>`).join("");
     }
   }
@@ -264,24 +280,51 @@ function poolOptions(pk, D) {
 }
 function poolLabel(pk) { return pk.startsWith("skills:") ? CLASSES[pk.slice(7)].name + " skill proficiencies" : POOLS[pk]?.label || pk; }
 const POOLS_WITH_INFO = new Set(["armorModel", "invocations", "metamagic", "maneuvers", "fightingStyle", "divineOrder", "primalOrder", "mastery"]);
+const LANG_POOLS = new Set(["langOrigin", "langDeft"]);
+function optChoiceUI(pk, o, c, D) {
+  const spec = OPTION_CHOICES[o]; if (!spec) return "";
+  const key = pk + "|" + o, ch = (c.optChoices || {})[key] || {}, path = "optChoices." + key;
+  let h = `<div class="optchoice">`;
+  if (spec.feat) h += `<b class="small">${esc(spec.label)}:</b>${featSelect(path + ".feat", ch.feat, spec.feat)}${featPicks(path + ".feat", ch.feat, D)}`;
+  if (spec.cantrip) {
+    const known = c.spells.filter(s => s.cls === spec.cantrip && (spellInfo(s.name)?.level ?? s.level) === 0).map(s => s.name);
+    const opts = [...new Set(["Eldritch Blast", ...known])];
+    h += `<label class="small"><b>${esc(spec.label)}:</b> ${sel(path + ".cantrip", ch.cantrip || "", opts, { blank: "— choose —" })}</label>`;
+  }
+  if (spec.text) h += `<label class="small"><b>${esc(spec.text)}:</b> ${inp(path + ".text", ch.text || "", { ph: spec.ph || "" })}</label>`;
+  if (spec.note) h += `<span class="small muted">${esc(spec.note)}</span>`;
+  return h + `</div>`;
+}
 function poolPicker(pk, D, c, oldMax) {
   const p = D.pools[pk]; if (!p) return "";
   const cur = (c.pools[pk] || []);
   const opts = poolOptions(pk, D);
-  const taken = pk.startsWith("skills:") || pk === "skillful" || pk === "keenSenses" || pk === "skillsLore" || pk === "primalKnowledge" ? new Set(D.profSkills.filter(s => !cur.includes(s))) : new Set();
+  const isSkill = pk.startsWith("skills:") || ["skillful", "keenSenses", "skillsLore", "primalKnowledge"].includes(pk);
+  const taken = isSkill ? new Set(D.profSkills.filter(s => !cur.includes(s))) : LANG_POOLS.has(pk) ? new Set((D.languages || []).filter(l => !cur.includes(l))) : new Set();
   const info = POOLS_WITH_INFO.has(pk);
-  const open = S.ui.optInfo && S.ui.optInfo.pk === pk ? S.ui.optInfo.o : null;
-  return `<div style="margin:10px 0"><b>${esc(poolLabel(pk))}</b> <span class="chip ${cur.length < p.max ? "acc" : ""}">${Math.min(cur.length, p.max)} / ${p.max}${oldMax !== undefined && p.max > oldMax ? ` (+${p.max - oldMax} new)` : ""}</span>${info ? ' <span class="small muted">tap ⓘ to read</span>' : ""}
-  ${(() => {
-    const pre = POOLS[pk]?.prereq;
-    const box = (o, lock, hint) => `<label class="${taken.has(o) || lock ? "muted" : ""}"><input type="checkbox" data-act="pool" data-k="${esc(pk)}" data-v="${esc(o)}" ${cur.includes(o) ? "checked" : ""} ${!cur.includes(o) && (cur.length >= p.max || taken.has(o) || lock) ? "disabled" : ""}>${esc(o)}${taken.has(o) ? " ✓" : ""}${hint ? ` <span class="small muted">(${esc(hint)})</span>` : ""}${info ? ` <a href="#" class="info ${open === o ? "on" : ""}" data-act="optInfo" data-k="${esc(pk)}" data-v="${esc(o)}">ⓘ</a>` : ""}</label>`;
-    if (!pre) return `<div class="checks">${opts.map(o => box(o)).join("")}</div>`;
+  const openSet = S.ui.optOpen ||= {};
+  const head = `<b>${esc(poolLabel(pk))}</b> <span class="chip ${cur.length < p.max ? "acc" : ""}">${Math.min(cur.length, p.max)} / ${p.max}${oldMax !== undefined && p.max > oldMax ? ` (+${p.max - oldMax} new)` : ""}</span>${info ? ' <span class="small muted">tap ▸ to read</span>' : ""}`;
+  const dis = (o, lock) => !cur.includes(o) && (cur.length >= p.max || taken.has(o) || lock);
+  // simple grid (skills, languages, masteries)
+  const box = o => `<label class="${taken.has(o) ? "muted" : ""}"><input type="checkbox" data-act="pool" data-k="${esc(pk)}" data-v="${esc(o)}" ${cur.includes(o) ? "checked" : ""} ${dis(o) ? "disabled" : ""}>${esc(o)}${taken.has(o) ? " ✓" : ""}</label>`;
+  if (!info || pk === "mastery") return `<div style="margin:10px 0">${head}<div class="checks">${opts.map(box).join("")}</div></div>`;
+  // single-column list with inline details
+  const row = (o, lock, hint) => { const k = pk + "|" + o, open = openSet[k];
+    return `<div class="optrow ${cur.includes(o) ? "on" : ""} ${lock && !cur.includes(o) ? "locked" : ""}">
+      <div class="row" style="gap:6px;flex-wrap:nowrap"><label style="flex:1"><input type="checkbox" data-act="pool" data-k="${esc(pk)}" data-v="${esc(o)}" ${cur.includes(o) ? "checked" : ""} ${dis(o, lock) ? "disabled" : ""}> <b>${esc(o)}</b>${hint ? ` <span class="small muted">${esc(hint)}</span>` : ""}</label>
+      <a href="#" class="opttog" data-act="optToggle" data-k="${esc(k)}">${open ? "▾ hide" : "▸ details"}</a></div>
+      ${open ? `<div class="desc optdesc">${para(optionText(pk, o)) || '<span class="muted">No description found in the imported rules text.</span>'}</div>` : ""}
+      ${cur.includes(o) ? optChoiceUI(pk, o, c, D) : ""}</div>`; };
+  const pre = POOLS[pk]?.prereq;
+  let body;
+  if (!pre) body = opts.map(o => row(o)).join("");
+  else {
     const lvl = D.cls.warlock || 0, groups = {};
     opts.forEach(o => { const l = (pre[o] || [1])[0]; (groups[l] ||= []).push(o); });
-    return Object.keys(groups).sort((a, b) => a - b).map(l => `<div class="pgrp">${+l === 1 ? "No level prerequisite" : "Warlock level " + l + "+"}${lvl < +l ? ` <span class="muted" style="text-transform:none;font-weight:600">— unlocks at level ${l}</span>` : ""}</div>
-      <div class="checks">${groups[l].map(o => box(o, lvl < +l && !cur.includes(o), (pre[o] || [])[1] ? "needs " + pre[o][1] : "")).join("")}</div>`).join("");
-  })()}
-  ${open ? `<div class="infobox"><div class="row"><b>${esc(open)}</b><a href="#" class="right" data-act="optInfo" data-k="${esc(pk)}" data-v="">✕</a></div><div class="desc">${para(optionText(pk, open)) || '<span class="muted">No description found in the imported rules text.</span>'}</div></div>` : ""}</div>`;
+    body = Object.keys(groups).sort((a, b) => a - b).map(l => `<div class="pgrp">${+l === 1 ? "No level prerequisite" : "Warlock level " + l + "+"}${lvl < +l ? ` <span class="muted" style="text-transform:none;font-weight:600">— unlocks at level ${l}</span>` : ""}</div>`
+      + groups[l].map(o => row(o, lvl < +l, (pre[o] || [])[1] ? "needs " + pre[o][1] : "")).join("")).join("");
+  }
+  return `<div style="margin:10px 0">${head}<div class="optlist">${body}</div></div>`;
 }
 
 function bBackground(c, D) {
@@ -430,7 +473,7 @@ function bEquipment(c, D) {
   <div class="card"><h3>Equipment & items</h3>
     <table class="t"><tr><th>Item</th><th class="num">Qty</th><th>Notes</th><th></th></tr>
     ${c.items.map((it, i) => `<tr><td>${inp(`items.${i}.name`, it.name, { style: "width:100%" })}</td><td class="num">${inp(`items.${i}.qty`, +it.qty || 1, { type: "number", style: "width:60px" })}</td><td>${inp(`items.${i}.note`, it.note || "", { style: "width:100%" })}</td><td><button class="small ghost" data-act="del" data-p="items" data-i="${i}">✕</button></td></tr>`).join("")}</table>
-    <button class="small" style="margin-top:8px" data-act="addItem">+ Add item</button>
+    <div class="row" style="margin-top:8px"><button data-act="shopOpen">🛒 Shop</button><button class="small ghost" data-act="addItem">+ Add item by hand</button></div>
   </div>`;
 }
 

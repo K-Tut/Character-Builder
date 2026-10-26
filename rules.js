@@ -637,3 +637,66 @@ const INVOCATION_PREREQ = {
   "Witch Sight": [15]
 };
 POOLS.invocations.prereq = INVOCATION_PREREQ;
+
+// ---------- LANGUAGES ----------
+const LANG_STANDARD = ["Common Sign Language", "Draconic", "Dwarvish", "Elvish", "Giant", "Gnomish", "Goblin", "Halfling", "Orc"];
+const LANG_RARE = ["Abyssal", "Celestial", "Deep Speech", "Infernal", "Primordial", "Sylvan", "Undercommon"];
+POOLS.langOrigin = { label: "Languages (choose 2 standard languages)", options: () => LANG_STANDARD };
+POOLS.langDeft = { label: "Deft Explorer languages", options: () => LANG_STANDARD.concat(LANG_RARE) };
+CLASSES.ranger.pools.langDeft = step({ 2: 2 });
+const CLASS_LANGS = { rogue: "Thieves' Cant", druid: "Druidic" };
+
+// ---------- extra choices that come with certain options ----------
+const OPTION_CHOICES = {
+  "Lessons of the First Ones": { feat: ["origin"], label: "Origin feat" },
+  "Agonizing Blast": { cantrip: "warlock", label: "Cantrip" },
+  "Eldritch Spear": { cantrip: "warlock", label: "Cantrip" },
+  "Repelling Blast": { cantrip: "warlock", label: "Cantrip" },
+  "Pact of the Blade": { text: "Pact weapon", ph: "e.g. Longsword" },
+  "Pact of the Chain": { text: "Familiar form", ph: "e.g. Imp, Pseudodragon, Sprite" },
+  "Pact of the Tome": { note: "Pick 3 cantrips and 2 level-1 ritual spells (any class) in Build → Spells → Other." },
+  "Blessed Warrior": { note: "Pick 2 Cleric cantrips in Build → Spells → Other." },
+  "Druidic Warrior": { note: "Pick 2 Druid cantrips in Build → Spells → Other." }
+};
+
+// ---------- SHOP (2024 Player's Handbook prices) ----------
+const WEAPON_COST = { "Club": "1 sp", "Dagger": "2 gp", "Greatclub": "2 sp", "Handaxe": "5 gp", "Javelin": "5 sp", "Light Hammer": "2 gp", "Mace": "5 gp", "Quarterstaff": "2 sp", "Sickle": "1 gp", "Spear": "1 gp",
+  "Dart": "5 cp", "Light Crossbow": "25 gp", "Shortbow": "25 gp", "Sling": "1 sp", "Battleaxe": "10 gp", "Flail": "10 gp", "Glaive": "20 gp", "Greataxe": "30 gp", "Greatsword": "50 gp", "Halberd": "20 gp",
+  "Lance": "10 gp", "Longsword": "15 gp", "Maul": "10 gp", "Morningstar": "15 gp", "Pike": "5 gp", "Rapier": "25 gp", "Scimitar": "25 gp", "Shortsword": "10 gp", "Trident": "5 gp", "Warhammer": "15 gp",
+  "War Pick": "5 gp", "Whip": "2 gp", "Blowgun": "10 gp", "Hand Crossbow": "75 gp", "Heavy Crossbow": "50 gp", "Longbow": "50 gp", "Musket": "500 gp", "Pistol": "250 gp" };
+const ARMOR_COST = { padded: "5 gp", leather: "10 gp", studded: "45 gp", hide: "10 gp", chainshirt: "50 gp", scale: "50 gp", breastplate: "400 gp", halfplate: "750 gp", ring: "30 gp", chainmail: "75 gp", splint: "200 gp", plate: "1500 gp" };
+const SHOP_GEAR = [
+  // [name, cost, bundle size (added quantity), item name in inventory]
+  ["Arrows (20)", "1 gp", 20, "Arrows"], ["Bolts (20)", "1 gp", 20, "Bolts"], ["Firearm Bullets (10)", "3 gp", 10, "Firearm Bullets"], ["Sling Bullets (20)", "4 cp", 20, "Sling Bullets"], ["Needles (50)", "1 gp", 50, "Blowgun Needles"],
+  ["Acid", "25 gp"], ["Alchemist's Fire", "50 gp"], ["Antitoxin", "50 gp"], ["Arcane Focus: Crystal", "10 gp"], ["Arcane Focus: Orb", "20 gp"], ["Arcane Focus: Rod", "10 gp"], ["Arcane Focus: Staff", "5 gp"], ["Arcane Focus: Wand", "10 gp"],
+  ["Backpack", "2 gp"], ["Ball Bearings", "1 gp"], ["Barrel", "2 gp"], ["Basket", "4 sp"], ["Bedroll", "1 gp"], ["Bell", "1 gp"], ["Blanket", "5 sp"], ["Block and Tackle", "1 gp"], ["Book", "25 gp"], ["Bottle, Glass", "2 gp"], ["Bucket", "5 cp"],
+  ["Burglar's Pack", "16 gp"], ["Caltrops", "1 gp"], ["Candle", "1 cp"], ["Case, Crossbow Bolt", "1 gp"], ["Case, Map or Scroll", "1 gp"], ["Chain", "5 gp"], ["Chest", "5 gp"], ["Climber's Kit", "25 gp"], ["Clothes, Fine", "15 gp"], ["Clothes, Traveler's", "2 gp"],
+  ["Component Pouch", "25 gp"], ["Costume", "5 gp"], ["Crowbar", "2 gp"], ["Diplomat's Pack", "39 gp"], ["Druidic Focus: Sprig of Mistletoe", "1 gp"], ["Druidic Focus: Wooden Staff", "5 gp"], ["Druidic Focus: Yew Wand", "10 gp"],
+  ["Dungeoneer's Pack", "12 gp"], ["Entertainer's Pack", "40 gp"], ["Explorer's Pack", "10 gp"], ["Flask", "2 cp"], ["Grappling Hook", "2 gp"], ["Healer's Kit", "5 gp"], ["Holy Symbol: Amulet", "5 gp"], ["Holy Symbol: Emblem", "5 gp"], ["Holy Symbol: Reliquary", "5 gp"],
+  ["Holy Water", "25 gp"], ["Hunting Trap", "5 gp"], ["Ink", "10 gp"], ["Ink Pen", "2 cp"], ["Jug", "2 cp"], ["Ladder", "1 sp"], ["Lamp", "5 sp"], ["Lantern, Bullseye", "10 gp"], ["Lantern, Hooded", "5 gp"], ["Lock", "10 gp"], ["Magnifying Glass", "100 gp"],
+  ["Manacles", "2 gp"], ["Map", "1 gp"], ["Mirror", "5 gp"], ["Net", "1 gp"], ["Oil", "1 sp"], ["Paper", "2 sp"], ["Parchment", "1 sp"], ["Perfume", "5 gp"], ["Poison, Basic", "100 gp"], ["Pole", "5 cp"], ["Pot, Iron", "2 gp"], ["Potion of Healing", "50 gp"],
+  ["Pouch", "5 sp"], ["Priest's Pack", "33 gp"], ["Quiver", "1 gp"], ["Ram, Portable", "4 gp"], ["Rations", "5 sp"], ["Robe", "1 gp"], ["Rope", "1 gp"], ["Sack", "1 cp"], ["Scholar's Pack", "40 gp"], ["Shovel", "2 gp"], ["Signal Whistle", "5 cp"],
+  ["Spell Scroll (Cantrip)", "30 gp"], ["Spell Scroll (Level 1)", "50 gp"], ["Spikes, Iron", "1 gp"], ["Spyglass", "1000 gp"], ["String", "1 sp"], ["Tent", "2 gp"], ["Tinderbox", "5 sp"], ["Torch", "1 cp"], ["Vial", "1 gp"], ["Waterskin", "2 sp"]
+];
+const SHOP_TOOLS = [["Alchemist's Supplies", "50 gp"], ["Brewer's Supplies", "20 gp"], ["Calligrapher's Supplies", "10 gp"], ["Carpenter's Tools", "8 gp"], ["Cartographer's Tools", "15 gp"], ["Cobbler's Tools", "5 gp"], ["Cook's Utensils", "1 gp"],
+  ["Glassblower's Tools", "30 gp"], ["Jeweler's Tools", "25 gp"], ["Leatherworker's Tools", "5 gp"], ["Mason's Tools", "10 gp"], ["Painter's Supplies", "10 gp"], ["Potter's Tools", "10 gp"], ["Smith's Tools", "20 gp"], ["Tinker's Tools", "50 gp"],
+  ["Weaver's Tools", "1 gp"], ["Woodcarver's Tools", "1 gp"], ["Disguise Kit", "25 gp"], ["Forgery Kit", "15 gp"], ["Gaming Set: Dice", "1 sp"], ["Gaming Set: Dragonchess", "1 gp"], ["Gaming Set: Playing Cards", "5 sp"], ["Gaming Set: Three-Dragon Ante", "1 gp"],
+  ["Herbalism Kit", "5 gp"], ["Musical Instrument: Bagpipes", "30 gp"], ["Musical Instrument: Drum", "6 gp"], ["Musical Instrument: Dulcimer", "25 gp"], ["Musical Instrument: Flute", "2 gp"], ["Musical Instrument: Horn", "3 gp"], ["Musical Instrument: Lute", "35 gp"],
+  ["Musical Instrument: Lyre", "30 gp"], ["Musical Instrument: Pan Flute", "12 gp"], ["Musical Instrument: Shawm", "2 gp"], ["Musical Instrument: Viol", "30 gp"], ["Navigator's Tools", "25 gp"], ["Poisoner's Kit", "50 gp"], ["Thieves' Tools", "25 gp"]];
+const SHOP_MOUNTS = [["Camel", "50 gp"], ["Elephant", "200 gp"], ["Horse, Draft", "50 gp"], ["Horse, Riding", "75 gp"], ["Mastiff", "25 gp"], ["Mule", "8 gp"], ["Pony", "30 gp"], ["Warhorse", "400 gp"],
+  ["Bit and Bridle", "2 gp"], ["Saddle, Exotic", "60 gp"], ["Saddle, Military", "20 gp"], ["Saddle, Riding", "10 gp"], ["Feed (per day)", "5 cp"], ["Stabling (per day)", "5 sp"],
+  ["Carriage", "100 gp"], ["Cart", "15 gp"], ["Chariot", "250 gp"], ["Sled", "20 gp"], ["Wagon", "35 gp"],
+  ["Rowboat", "50 gp"], ["Keelboat", "3000 gp"], ["Longship", "10000 gp"], ["Sailing Ship", "10000 gp"], ["Galley", "30000 gp"], ["Warship", "25000 gp"], ["Airship", "40000 gp"]];
+function costCp(s) { const m = String(s).match(/([\d,]+)\s*(cp|sp|ep|gp|pp)/i); if (!m) return 0; return +m[1].replace(/,/g, "") * { cp: 1, sp: 10, ep: 50, gp: 100, pp: 1000 }[m[2].toLowerCase()]; }
+function fmtCp(cp) { const gp = Math.floor(cp / 100), sp = Math.floor((cp % 100) / 10), c = cp % 10; return [gp && gp.toLocaleString() + " gp", sp && sp + " sp", c && c + " cp"].filter(Boolean).join(" ") || "0 gp"; }
+function shopCatalog() {
+  const out = [];
+  WEAPONS.filter(w => WEAPON_COST[w.name]).forEach(w => out.push({ id: "w:" + w.name, name: w.name, cat: "Weapons", sub: { simple: "Simple melee", simpleR: "Simple ranged", martial: "Martial melee", martialR: "Martial ranged" }[w.cat], cost: costCp(WEAPON_COST[w.name]), kind: "weapon", info: `${w.dmg} ${w.type}${w.props ? " · " + w.props : ""}${w.mastery ? " · Mastery: " + w.mastery : ""}` }));
+  Object.entries(ARMOR).filter(([k]) => ARMOR_COST[k]).forEach(([k, a]) => out.push({ id: "a:" + k, name: a.name, cat: "Armor", sub: { light: "Light armor", medium: "Medium armor", heavy: "Heavy armor" }[a.kind], cost: costCp(ARMOR_COST[k]), kind: "armor", armorKey: k,
+    info: `AC ${a.base}${a.kind === "light" ? " + Dex" : a.kind === "medium" ? " + Dex (max 2)" : ""}${a.str ? " · Str " + a.str : ""}${a.stealth ? " · Stealth disadvantage" : ""}` }));
+  out.push({ id: "a:shield", name: "Shield", cat: "Armor", sub: "Shield", cost: costCp("10 gp"), kind: "shield", info: "+2 AC" });
+  SHOP_GEAR.forEach(([n, c, b, inv]) => out.push({ id: "g:" + n, name: n, cat: "Adventuring Gear", sub: /^(Arrows|Bolts|Firearm|Sling Bullets|Needles)/.test(n) ? "Ammunition" : /Pack$/.test(n) ? "Equipment packs" : /Focus|Holy Symbol/.test(n) ? "Spellcasting foci" : "Gear", cost: costCp(c), kind: "item", bundle: b || 1, invName: inv || n }));
+  SHOP_TOOLS.forEach(([n, c]) => out.push({ id: "t:" + n, name: n, cat: "Tools", sub: /Supplies|Tools|Utensils/.test(n) && !/Thieves|Navigator/.test(n) ? "Artisan's tools" : "Other tools", cost: costCp(c), kind: "item" }));
+  SHOP_MOUNTS.forEach(([n, c], i) => out.push({ id: "m:" + n, name: n, cat: "Mounts & Vehicles", sub: i < 8 ? "Mounts and other animals" : i < 14 ? "Tack, harness and upkeep" : i < 19 ? "Drawn vehicles" : i < 25 ? "Waterborne vehicles" : "Airborne vehicles", cost: costCp(c), kind: "item" }));
+  return out;
+}

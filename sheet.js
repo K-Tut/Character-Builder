@@ -27,7 +27,7 @@ function renderSheet() {
     <p class="small muted" style="margin:6px 0 0">🎲 Tap a modifier, save or skill to roll.</p></div>
     <div class="card"><h3>Skills</h3>${SKILLS_BY_ABILITY.map(s => { const k = D.skill[s]; return `<div class="skill roll" style="background:var(--${k.a})" ${R(s + " check", k.v)}><span><span class="dot ${k.e ? "e" : k.p ? "p" : ""}"></span>${s} <span class="muted small">${ABBR[k.a]}</span></span><b>${sgn(k.v)}</b></div>`; }).join("")}
     <p class="small" style="margin:8px 0 0">Passive Perception <b>${D.passive.perception}</b> · Insight <b>${D.passive.insight}</b> · Investigation <b>${D.passive.investigation}</b></p></div>
-    <div class="card"><h3>Proficiencies</h3><p class="small"><b>Armor:</b> ${esc(D.armorTraining.join(", ") || "none")}<br><b>Weapons:</b> ${esc(D.weaponText || "none")}<br><b>Tools:</b> ${esc(D.tools.join(", ") || "none")}<br><b>Languages:</b> ${esc(c.languages)}${c.otherProfs ? "<br>" + esc(c.otherProfs) : ""}</p></div>`;
+    <div class="card"><h3>Proficiencies</h3><p class="small"><b>Armor:</b> ${esc(D.armorTraining.join(", ") || "none")}<br><b>Weapons:</b> ${esc(D.weaponText || "none")}<br><b>Tools:</b> ${esc(D.tools.join(", ") || "none")}<br><b>Languages:</b> ${esc(D.languages.join(", "))}${c.otherProfs ? "<br>" + esc(c.otherProfs) : ""}</p></div>`;
 
   // column 2: combat
   const exh = +P.exhaustion || 0;
@@ -59,7 +59,7 @@ function renderSheet() {
   else if (t === "spells") c3 += sheetSpells(c, D);
   else if (t === "inventory") c3 += `<div class="row">${["cp", "sp", "ep", "gp", "pp"].map(k => `<label class="small">${k.toUpperCase()} ${inp("coins." + k, +c.coins[k] || 0, { type: "number", style: "width:64px" })}</label>`).join("")}</div>
     <table class="t" style="margin-top:8px"><tr><th>Item</th><th class="num">Qty</th><th>Notes</th><th></th></tr>${c.items.map((it, i) => `<tr><td>${inp(`items.${i}.name`, it.name, { style: "width:100%" })}</td><td class="num">${inp(`items.${i}.qty`, +it.qty || 1, { type: "number", style: "width:56px" })}</td><td>${inp(`items.${i}.note`, it.note || "", { style: "width:100%" })}</td><td><button class="small ghost" data-act="del" data-p="items" data-i="${i}">✕</button></td></tr>`).join("")}</table>
-    <button class="small" style="margin-top:8px" data-act="addItem">+ Add item</button><p class="small muted">Armor: ${esc(D.armor.name)}${c.shield ? " + Shield" : ""} (change in Build → Equipment)</p>`;
+    <div class="row" style="margin-top:8px"><button data-act="shopOpen">🛒 Shop</button><button class="small ghost" data-act="addItem">+ Add item by hand</button></div><p class="small muted">Armor: ${esc(D.armor.name)}${c.shield ? " + Shield" : ""} (change in Build → Equipment)</p>`;
   else if (t === "notes") c3 += `<textarea data-live="notes" style="min-height:420px">${esc(c.notes)}</textarea>`;
   else if (t === "story") c3 += `${c.storyImage ? `<img src="${c.storyImage}" style="float:right;max-width:40%;border-radius:8px;margin:0 0 8px 10px">` : ""}<div class="desc">${para(c.backstory) || '<span class="muted">Write the backstory in Build → Story.</span>'}</div>`;
   c3 += `</div>`;
@@ -100,12 +100,13 @@ function sheetSpells(c, D) {
 // ---------- MODALS ----------
 function openModal(m) { S.modal = m; renderModal(); }
 function closeModal() { S.modal = null; S.draft = null; renderModal(); }
-function renderModal() {
+function renderModal() { keepScroll(renderModalInner); }
+function renderModalInner() {
   const bg = $("#modal"), box = $("#modal-box");
   if (!S.modal) { bg.classList.add("hidden"); return; }
   bg.classList.remove("hidden");
   const st = box.scrollTop;
-  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest }[S.modal.type]();
+  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, shop: () => mShop() }[S.modal.type]();
   box.scrollTop = st;
 }
 
@@ -275,7 +276,7 @@ const ACT = {
   shortRest: () => openModal({ type: "shortRest" }),
   hdRoll: el => {
     const c = S.char, D = derive(c), die = el.dataset.d, sides = +die.slice(1);
-    const roll = 1 + Math.floor(Math.random() * sides), heal = Math.max(0, roll + D.mod.con);
+    const roll = rollDie(sides), heal = Math.max(0, roll + D.mod.con);
     c.play.hd[die] = (c.play.hd[die] || 0) + 1; c.play.hp = Math.min(D.hpMax, Math.min(c.play.hp ?? D.hpMax, D.hpMax) + heal);
     S.modal.log = (S.modal.log ? S.modal.log + " · " : "") + `${die}: rolled ${roll} ${sgn(D.mod.con)} = +${heal} HP`;
     save(); render();
@@ -288,7 +289,7 @@ const ACT = {
   modalClose: () => { closeModal(); render(); },
   luClass: el => { const lv = S.draft.levels[S.draft.levels.length - 1]; if (lv.cls !== el.dataset.k) { lv.cls = el.dataset.k; lv.hp = null; lv.asi = null; S.draft.subclasses = clone(S.char.subclasses); S.draft.pools = clone(S.char.pools); } renderModal(); },
   luSub: (el, e) => { e.preventDefault(); const lv = S.draft.levels[S.draft.levels.length - 1]; if (el.dataset.k) S.draft.subclasses[lv.cls] = el.dataset.k; else delete S.draft.subclasses[lv.cls]; renderModal(); },
-  rollHp: () => { const lv = S.draft.levels[S.draft.levels.length - 1]; lv.hp = 1 + Math.floor(Math.random() * CLASSES[lv.cls].hd); renderModal(); },
+  rollHp: () => { const lv = S.draft.levels[S.draft.levels.length - 1]; lv.hp = rollDie(CLASSES[lv.cls].hd); renderModal(); },
   luConfirm: () => {
     const old = S.modal.oldD; const D = derive(S.draft);
     const P = S.draft.play; P.hp = Math.min(D.hpMax, (P.hp ?? old.hpMax) + (D.hpMax - old.hpMax));
@@ -306,6 +307,7 @@ const ACT = {
   },
   featReset: () => { const m = S.char.featureMeta[S.modal.key]; if (m) delete m.text; closeModal(); save(); render(); },
   printNow: () => window.print(),
+  optToggle: el => { const o = S.ui.optOpen ||= {}; o[el.dataset.k] = !o[el.dataset.k]; S.modal ? renderModal() : render(); },
   spellPeek: el => { S.ui.spellPeek = el.dataset.v && S.ui.spellPeek !== el.dataset.v ? el.dataset.v : null; render(); },
   setLineageRow: el => { S.char.species.choice = el.dataset.v; save(); render(); },
   linInfo: el => { S.ui.linInfo = S.ui.linInfo === el.dataset.v ? null : el.dataset.v; render(); },

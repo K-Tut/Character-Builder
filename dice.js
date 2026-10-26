@@ -74,7 +74,7 @@ const Dice = {
   roll(title, groups, flat, isD20) {
     const res = [];
     for (const g of groups) {
-      const vals = Array.from({ length: g.n }, () => 1 + Math.floor(Math.random() * g.s));
+      const vals = Array.from({ length: g.n }, () => rollDie(g.s));
       let keepIdx = null;
       if (g.keep && vals.length === 2) keepIdx = g.keep === "high" ? (vals[0] >= vals[1] ? 0 : 1) : (vals[0] <= vals[1] ? 0 : 1);
       vals.forEach((v, i) => res.push({ s: g.s, v, sign: g.sign, dropped: keepIdx !== null && i !== keepIdx, d20: g.s === 20 && isD20 }));

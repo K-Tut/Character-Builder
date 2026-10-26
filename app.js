@@ -5,6 +5,12 @@
 const S = { wiki: { pages: {}, spells: {} }, idx: null, chars: [], char: null, draft: null, view: "home", tab: "basics", sheetTab: "features", modal: null, ui: {} };
 
 // ---------- helpers ----------
+// fair die roll from the device's cryptographic random generator (rejection sampling avoids any bias)
+function rollDie(sides) {
+  const a = new Uint32Array(1), lim = Math.floor(0x100000000 / sides) * sides; let x;
+  do { crypto.getRandomValues(a); x = a[0]; } while (x >= lim);
+  return 1 + (x % sides);
+}
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 const norm = s => String(s || "").toLowerCase().replace(/[’'`]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
@@ -127,7 +133,7 @@ function newChar() {
     levels: [], subclasses: {}, pools: {}, spells: [],
     armor: "", shield: false, acBonus: 0, initBonus: 0, speedBonus: 0, hpBonus: 0,
     weapons: [], items: [], coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
-    languages: "Common", otherProfs: "", phys: { age: "", height: "", weight: "", eyes: "", hair: "", skin: "", alignment: "" },
+    languages: "Common", langExtra: "", optChoices: {}, otherProfs: "", phys: { age: "", height: "", weight: "", eyes: "", hair: "", skin: "", alignment: "" },
     backstory: "", notes: "", portrait: "", storyImage: "", thumb: "",
     custom: [], featureMeta: {},
     play: { hp: null, temp: 0, used: {}, slots: {}, pact: 0, hd: {}, ds: { s: 0, f: 0 }, exhaustion: 0, inspiration: false, conditions: [] }
@@ -156,6 +162,10 @@ function allFeats(c) {
 }
 function restFeats(c) {
   const out = [];
+  for (const key in c.optChoices || {}) {
+    const [pk, opt] = key.split("|"); const ch = c.optChoices[key];
+    if (ch && ch.feat && ch.feat.name && (c.pools[pk] || []).includes(opt)) out.push({ ...ch.feat, src: opt });
+  }
   if (SPECIES[c.species.id]?.extraOriginFeat && c.speciesFeat?.name) out.push({ ...c.speciesFeat, src: "Species (Versatile)", origin: true });
   c.levels.forEach((lv, i) => {
     if (lv.asi?.mode === "feat" && lv.asi.feat?.name) out.push({ ...lv.asi.feat, src: CLASSES[lv.cls].name + " lvl " + classLevelAt(c, i) });
@@ -207,6 +217,7 @@ function derive(c) {
     const sub = D.subs[k]; if (sub) for (const pk in sub.pools || {}) addPool(pk, at(sub.pools[pk], l), C);
   }
   if (sp) for (const pk in sp.pools || {}) addPool(pk, sp.pools[pk]);
+  addPool("langOrigin", 2);
   const picked = k => (c.pools[k] || []);
 
   // option effects (Protector, Magician...)
@@ -236,6 +247,14 @@ function derive(c) {
   const jack = (D.cls.bard || 0) >= 2 ? Math.floor(D.pb / 2) : 0;
   D.skill = {};
   ALL_SKILLS.forEach(s => { const a = SKILLS[s]; D.skill[s] = { v: D.mod[a] + (exp.has(s) ? 2 * D.pb : prof.has(s) ? D.pb : jack), p: prof.has(s), e: exp.has(s), a }; });
+  // languages: Common + 2 standard + class languages + Deft Explorer + extras
+  const langs = ["Common"];
+  const addL = l => { l = String(l || "").trim(); if (l && !langs.some(x => x.toLowerCase() === l.toLowerCase())) langs.push(l); };
+  picked("langOrigin").slice(0, 2).forEach(addL);
+  for (const k in D.cls) if (CLASS_LANGS[k]) addL(CLASS_LANGS[k]);
+  picked("langDeft").slice(0, D.pools.langDeft?.max || 0).forEach(addL);
+  String(c.langExtra || "").split(/[,;]/).forEach(addL);
+  D.languages = langs;
   D.passive = { perception: 10 + D.skill.Perception.v, insight: 10 + D.skill.Insight.v, investigation: 10 + D.skill.Investigation.v };
 
   // armor & weapon training
@@ -456,7 +475,9 @@ function collectFeatures(c, D) {
     const p = D.pools[pk]; if (!p) continue;
     (c.pools[pk] || []).slice(0, p.max).forEach((o, i) => {
       const text = optionText(pk, o);
-      add("pool:" + pk + ":" + o + ":" + i, o, POOLS[pk].label, text, { cat: "option" });
+      const ch = (c.optChoices || {})[pk + "|" + o] || {};
+      const extra = ch.feat?.name || ch.cantrip || ch.text || "";
+      add("pool:" + pk + ":" + o + ":" + i, o + (extra ? " → " + extra : ""), POOLS[pk].label, text, { cat: "option", base: o });
     });
   }
   // custom
