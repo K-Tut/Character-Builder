@@ -1,11 +1,11 @@
 // Offline cache for the app shell. Bump VERSION when files change.
-const VERSION = "v9";
+const VERSION = "v10";
 const FILES = ["./", "index.html", "style.css", "print.css", "rules.js", "config.js", "app.js", "store.js", "ui.js", "print.js", "sheet.js", "dice.js", "shop.js", "manifest.json", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", e => {
   // always fetch fresh copies (bypass the browser's HTTP cache) when installing a new version
   e.waitUntil(caches.open(VERSION).then(c => Promise.all(FILES.map(f => fetch(f, { cache: "no-cache" }).then(r => r.ok && c.put(f, r)).catch(() => { })))).then(() => self.skipWaiting()));
 });
-self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION && !k.startsWith("dm-")).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("message", e => { if (e.data === "skipWaiting") self.skipWaiting(); });
 self.addEventListener("fetch", e => {
   const u = new URL(e.request.url);

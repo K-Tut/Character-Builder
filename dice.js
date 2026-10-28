@@ -124,7 +124,7 @@ const Dice = {
   // ---------- tray ----------
   sync() {
     const fab = document.getElementById("dicefab"); if (!fab) return;
-    const on = S.view === "sheet";
+    const on = !!S.diceAlways || S.view === "sheet";
     fab.classList.toggle("hidden", !on);
     fab.innerHTML = this.svg(20, 20, "fabdie");
     if (!on) { this.tray.open = false; }
