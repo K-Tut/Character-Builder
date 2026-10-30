@@ -56,6 +56,7 @@ function buildIndex() {
   idx.spellList.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   S.idx = idx; idx.feats = null;
 }
+const isLegacyPage = p => /:legacy-/.test(p.slug || p);
 function findPage(cat, name, exclude, fuzzy) {
   const list = (S.idx.pages[cat] || []).filter(p => !exclude || !exclude(p));
   const n = norm(name); if (!n) return null;
@@ -77,13 +78,16 @@ function lookup(name, slugs = []) {
   }
   for (const k of keys) {
     const arr = S.idx.sec[k]; if (!arr) continue;
-    const h = arr.find(a => a.cat !== "spell") || arr[0]; if (h) return stripSource(h.text);
+    const h = arr.find(a => a.cat !== "spell" && !isLegacyPage(a.slug)) || arr.find(a => a.cat !== "spell") || arr[0]; if (h) return stripSource(h.text);
   }
   return "";
 }
 function spellInfo(name) { return S.idx.spell[norm(name)] || null; }
 function classSlug(cls) { return S.wiki.pages[cls + ":main"] ? cls + ":main" : findPage(cls, CLASSES[cls].name); }
-function subclassSlug(cls, sub) { const sc = CLASSES[cls].subclasses[sub]; return sc ? findPage(cls, sc.name, p => p.slug.endsWith(":main"), true) : null; }
+function subclassSlug(cls, sub) { const sc = CLASSES[cls].subclasses[sub]; if (!sc) return null;
+  if (sc.legacy) return S.wiki.pages[sc.slug] ? sc.slug : null;
+  return findPage(cls, sc.name, p => p.slug.endsWith(":main") || isLegacyPage(p), true); }
+function speciesSlug(sp) { if (!sp) return null; if (sp.legacy) return S.wiki.pages[sp.slug] ? sp.slug : null; return findPage("species", sp.name, isLegacyPage); }
 
 // ---------- feat catalog: built-in feats + every feat page from the wiki ----------
 const FEAT_CATS = { origin: "Origin feats", general: "General feats", style: "Fighting Style feats", boon: "Epic Boon feats", other: "Other feats" };
@@ -217,6 +221,7 @@ function derive(c) {
     const sub = D.subs[k]; if (sub) for (const pk in sub.pools || {}) addPool(pk, at(sub.pools[pk], l), C);
   }
   if (sp) for (const pk in sp.pools || {}) addPool(pk, sp.pools[pk]);
+  if (sp?.skillChoice) addPool("spSkills", sp.skillChoice.n, { from: sp.skillChoice.from || ALL_SKILLS });
   addPool("langOrigin", 2);
   const picked = k => (c.pools[k] || []);
 
@@ -227,7 +232,9 @@ function derive(c) {
   // proficiencies: skills
   const prof = new Set(), exp = new Set(), tools = new Set();
   if (bg) { bg.skills.forEach(s => prof.add(s)); if (bg.tool) tools.add(bg.tool); }
-  for (const k in D.pools) if (k.startsWith("skills:") || k === "skillsLore" || k === "keenSenses" || k === "skillful" || k === "primalKnowledge") picked(k).slice(0, D.pools[k].max).forEach(s => prof.add(s));
+  (sp?.skills || []).forEach(s => prof.add(s));
+  for (const k in D.subs) (D.subs[k].skills || []).forEach(s => prof.add(s));
+  for (const k in D.pools) if (k.startsWith("skills:") || k === "skillsLore" || k === "keenSenses" || k === "skillful" || k === "primalKnowledge" || k === "spSkills") picked(k).slice(0, D.pools[k].max).forEach(s => prof.add(s));
   D.feats.forEach(f => {
     if (f.name === "Skilled") (f.picks?.skills || []).forEach(s => SKILLS[s] ? prof.add(s) : tools.add(s));
     if (f.name === "Skill Expert" && f.picks?.skill) prof.add(f.picks.skill);
@@ -359,7 +366,7 @@ function derive(c) {
   D.resources = [];
   const pushRes = (r, l, src) => {
     const n = val(r.n, l, D); if (!n) return;
-    D.resources.push({ key: r.key, name: r.name, max: n, reset: typeof r.reset === "function" ? r.reset(l) : r.reset, note: r.note || "", die: r.die ? r.die(l, D) : "", feature: r.feature, src });
+    D.resources.push({ key: r.key, name: r.name, max: n, reset: typeof r.reset === "function" ? r.reset(l) : r.reset, note: r.note || "", die: r.die ? r.die(l, D) : "", feature: r.feature, src, forms: r.forms });
   };
   for (const k in D.cls) {
     (CLASSES[k].resources || []).forEach(r => pushRes(r, D.cls[k], CLASSES[k].name));
@@ -440,7 +447,7 @@ function collectFeatures(c, D) {
   // species
   const sp = D.species;
   if (sp) {
-    const slug = findPage("species", sp.name);
+    const slug = speciesSlug(sp);
     for (const lv in sp.traits) for (const t of sp.traits[lv]) {
       if (D.level < +lv && D.level > 0) continue;
       let name = t; if (sp.choice && sp.choice.label === t && c.species.choice) name = t + ": " + c.species.choice;

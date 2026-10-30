@@ -246,3 +246,4 @@ a.spl.on { background: var(--accent-soft); }
 .price { white-space: nowrap; color: var(--muted); font-size: 13px; min-width: 70px; text-align: right; }
 .qty { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .qty b { min-width: 16px; text-align: center; }
+.formrow { margin: -2px 0 8px; gap: 4px; }

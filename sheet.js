@@ -48,7 +48,8 @@ function renderSheet() {
     <div class="row" style="margin-top:8px"><label>Exhaustion ${sel("play.exhaustion", exh, [0, 1, 2, 3, 4, 5, 6], { num: true })}</label>${exh ? `<span class="small warn">−${2 * exh} to d20 tests, −${5 * exh} ft speed${exh >= 6 ? " — DEAD" : ""}</span>` : ""}</div></div>
   <div class="card"><h3>Attacks</h3>${D.attacks.length ? `<table class="t"><tr><th>Weapon</th><th class="num">Hit</th><th>Damage</th></tr>${D.attacks.map(a => `<tr><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.props)}</div></td><td class="num big roll" style="font-size:17px" ${R(a.name + " attack", a.hit)}>${sgn(a.hit)}</td><td class="roll" ${RD(a.name + " damage", a.dmgFormula)}>${esc(a.dmg)}</td></tr>`).join("")}</table>` : '<p class="muted small">Add weapons in Build → Equipment.</p>'}
     ${D.cls.rogue ? `<p class="small">Sneak Attack: <b class="roll" ${RD("Sneak Attack", Math.ceil(D.cls.rogue / 2) + "d6")}>🎲 ${Math.ceil(D.cls.rogue / 2)}d6</b></p>` : ""}${D.cls.barbarian ? `<p class="small">Rage damage: <b>+${at(step({ 1: 2, 9: 3, 16: 4 }), D.cls.barbarian)}</b></p>` : ""}</div>`;
-  if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b>${esc(r.name)}</b>${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${pips(r.key, r.max, P.used[r.key])}</div>`).join("")}</div>`;
+  if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b>${esc(r.name)}</b>${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${pips(r.key, r.max, P.used[r.key])}</div>
+    ${r.forms ? `<div class="row small formrow">${(P.active || {})[r.key] ? `<span class="chip acc">Active: ${esc(P.active[r.key])}</span><a href="#" data-act="endForm" data-k="${r.key}">end</a>` : `<span class="muted">Use as:</span>${r.forms.map(f => `<button class="small ghost" data-act="useForm" data-k="${r.key}" data-f="${esc(f)}">${esc(f)}</button>`).join("")}`}</div>` : ""}`).join("")}</div>`;
   if (D.slots.length || D.pact) c2 += `<div class="card"><h3>Spell slots</h3>${D.slots.map((n, i) => `<div class="res"><span class="n">Level ${i + 1}</span>${pips("slot_" + (i + 1), n, P.slots[i + 1])}</div>`).join("")}
     ${D.pact ? `<div class="res"><span class="n">Pact slots (level ${D.pact.lvl}) <span class="small muted">short rest</span></span>${pips("pact", D.pact.n, P.pact)}</div>` : ""}</div>`;
 
@@ -137,7 +138,11 @@ function mLevelUp() {
   const feats = C.features[cl] || [];
   // subclass
   if (feats.includes("@sub") && !d.subclasses[lv.cls]) {
-    h += `<div class="lvl"><b>Choose your subclass:</b><div class="grid gauto" style="margin-top:6px">${Object.entries(C.subclasses).map(([k, s]) => `<div class="pick" data-act="luSub" data-k="${k}"><b>${s.name}</b><span class="small muted">${(s.features[cl] || []).join(", ")}</span></div>`).join("")}</div></div>`;
+    const subCard = ([k, s]) => `<div class="pick" data-act="luSub" data-k="${k}"><b>${s.name}</b><span class="small muted">${(s.features[cl] || []).join(", ")}</span>${s.legacy ? `<div class="small muted" style="font-style:italic;margin-top:2px">${esc(s.src)}</div>` : ""}</div>`;
+    const subs = Object.entries(C.subclasses), old = subs.filter(([, s]) => s.legacy);
+    h += `<div class="lvl"><b>Choose your subclass:</b><div class="grid gauto" style="margin-top:6px">${subs.filter(([, s]) => !s.legacy).map(subCard).join("")}</div>
+      ${old.length ? `<details style="margin-top:8px" ${S.ui.oldSubs ? "open" : ""}><summary data-act="toggleOldSubs"><b>Older subclasses</b> <span class="small muted">(${old.length}, from 2014-era books — adapted: everything they gave at level 1 or 2 comes at level 3)</span></summary>
+        <div class="grid gauto" style="margin-top:6px">${old.sort((a, b) => a[1].name.localeCompare(b[1].name)).map(subCard).join("")}</div></details>` : ""}</div>`;
   } else if (feats.includes("@sub") && d.subclasses[lv.cls] && !old.subs[lv.cls]) {
     h += `<p>Subclass: <b>${C.subclasses[d.subclasses[lv.cls]].name}</b> <a href="#" data-act="luSub" data-k="">change</a></p>`;
   }
@@ -233,7 +238,12 @@ const ACT = {
     toast("Saved " + name + " to your Downloads");
   },
   deleteChar: async () => { if (!confirm("Delete " + S.char.name + " on all devices?")) return; await storeDeleteChar(S.char.id); S.char = null; S.view = "home"; await loadChars(); render(); },
-  setSpecies: el => { const c = S.char; if (c.species.id !== el.dataset.id) { c.species = { id: el.dataset.id, choice: "", size: "" }; delete c.pools.keenSenses; delete c.pools.skillful; } save(); render(); },
+  setSpecies: el => { const c = S.char; if (c.species.id !== el.dataset.id) { c.species = { id: el.dataset.id, choice: "", size: "" }; delete c.pools.keenSenses; delete c.pools.skillful; delete c.pools.spSkills; } save(); render(); },
+  toggleOldSpecies: () => { S.ui.oldSpecies = !S.ui.oldSpecies; render(); },
+  toggleOldSubs: (el, e) => { e.preventDefault(); S.ui.oldSubs = !S.ui.oldSubs; renderModal(); },
+  useForm: el => { const c = S.char, r = derive(c).resources.find(x => x.key === el.dataset.k); if (!r) return; const used = c.play.used[r.key] || 0;
+    if (used >= r.max) return toast("No uses left — finish a Long Rest"); c.play.used[r.key] = used + 1; (c.play.active ||= {})[r.key] = el.dataset.f; save(); render(); toast(el.dataset.f + " — active for 1 minute"); },
+  endForm: el => { const c = S.char; if (c.play.active) delete c.play.active[el.dataset.k]; save(); render(); },
   setBg: el => { const c = S.char; if (c.background.id !== el.dataset.id) { applyStartEquip(c, [], "bg"); (c.startEquip ||= {}).bg = ""; c.background = { id: el.dataset.id, mode: "21", plus2: "", plus1: "", tool: "", skills: [], p111: [] }; c.bgFeat = { picks: {} }; } save(); render(); },
   pbm: el => { const a = el.dataset.a; S.char.base[a] = Math.max(8, Math.min(15, S.char.base[a] + +el.dataset.d)); save(); render(); },
   stdArray: () => { const D = derive(S.char); const order = [...ABILITIES].sort((a, b) => (D.startCls && CLASSES[D.startCls].primary.includes(b) ? 1 : 0) - (D.startCls && CLASSES[D.startCls].primary.includes(a) ? 1 : 0)); [15, 14, 13, 12, 10, 8].forEach((v, i) => S.char.base[order[i]] = v); save(); render(); },
@@ -269,7 +279,7 @@ const ACT = {
   longRest: () => {
     if (!confirm("Take a long rest? Restores HP, hit dice, spell slots and all uses.")) return;
     const P = S.char.play, D = derive(S.char);
-    Object.assign(P, { hp: D.hpMax, temp: 0, used: {}, slots: {}, pact: 0, hd: {}, ds: { s: 0, f: 0 }, exhaustion: Math.max(0, (+P.exhaustion || 0) - 1) });
+    Object.assign(P, { hp: D.hpMax, temp: 0, used: {}, slots: {}, pact: 0, hd: {}, ds: { s: 0, f: 0 }, active: {}, exhaustion: Math.max(0, (+P.exhaustion || 0) - 1) });
     P.conditions = P.conditions.filter(x => x !== "Raging" && x !== "Concentrating");
     save(); render(); toast("Long rest complete");
   },

@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-10-27";
+const APP_VERSION = "2026-10-30";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -50,6 +50,7 @@ async function openChar(id, view) {
   S.view = view || (S.char.levels.length ? "sheet" : "builder"); S.tab = "basics"; S.mtab = "combat"; render();
 }
 function migrate(c) {
+  if (c.species?.id === "aasimar" && c.species.choice) c.species.choice = "";   // the revelation form is now picked per use
   const d = newChar(); for (const k in d) if (c[k] === undefined) c[k] = d[k]; for (const k in d.play) if (c.play[k] === undefined) c.play[k] = d.play[k];
   if (c.langExtra === undefined) {   // old free-text languages -> standard picks + extras
     const parts = String(c.languages || "").split(/[,;]/).map(x => x.trim()).filter(x => x && !/^common$/i.test(x));
@@ -132,7 +133,7 @@ function renderHome() {
     ${syncOn ? " It syncs to your other devices automatically." : ""}</p>
     ${S.server ? (imp.running ? `<div class="progress"><div style="width:${imp.total ? Math.round(100 * imp.done / imp.total) : 3}%"></div></div><p class="small muted">${esc(imp.msg)} (${imp.done}/${imp.total})</p>` :
       `<div class="row"><button data-act="runImport">${np ? "Update" : "Import"} from dnd2024.wikidot.com</button>${np ? `<button class="ghost" data-act="runImport" data-refresh="1">Re-download everything</button>` : ""}</div>`)
-      : `<p class="small muted">Downloading from the wiki needs the Python program on your laptop (run.py). On the phone, the rules text arrives through Drive sync — or load a <code>wiki.json</code> file:</p>`}
+      : `<p class="small muted">New rules text comes from the laptop: update it there, then either upload the <code>wiki.enc</code> it creates (🔒 button) to your GitHub repo — the app finds it by itself — or load the <code>wiki.json</code> file here directly:</p>`}
     ${S.ui.wikiEnc && S.ui.wikiEncState === "locked" ? `<div class="lvl" style="margin:8px 0"><b>${np ? "Newer rules text available" : "Rules text available"}</b> <span class="small muted">(password protected${S.ui.wikiEnc.imported ? ", from " + esc(S.ui.wikiEnc.imported) : ""})</span>
       <div class="row" style="margin-top:6px"><input id="wikiPw" type="password" placeholder="Password" autocomplete="current-password"><label class="small"><input type="checkbox" id="wikiPwRem" checked> remember on this device</label><button data-act="wikiUnlock">Unlock</button></div></div>` : ""}
     <div class="row" style="margin-top:6px"><button class="ghost small" data-act="loadWikiFile">Load wiki.json file…</button>
@@ -186,17 +187,25 @@ function bBasics(c, D) {
 
 function bSpecies(c, D) {
   const sp = SPECIES[c.species.id];
-  let h = `<div class="card"><h3>Choose a species</h3><div class="grid gauto">${Object.entries(SPECIES).map(([k, s]) => `
-    <div class="pick ${c.species.id === k ? "on" : ""}" data-act="setSpecies" data-id="${k}"><b>${s.name}</b><span class="small muted">${s.size} · Speed ${s.speed}${s.darkvision ? " · Darkvision " + s.darkvision : ""}</span>
-    <div class="small">${Object.values(s.traits).flat().join(", ")}</div></div>`).join("")}</div></div>`;
+  const card = ([k, s]) => `
+    <div class="pick ${c.species.id === k ? "on" : ""}" data-act="setSpecies" data-id="${k}"><b>${s.name}</b><span class="small muted">${s.size} · Speed ${s.speed}${s.note ? " · " + s.note : ""}${s.darkvision ? " · Darkvision " + s.darkvision : ""}</span>
+    <div class="small">${Object.values(s.traits).flat().join(", ")}</div>${s.src ? `<div class="small muted">${esc(s.src)}</div>` : ""}</div>`;
+  const all = Object.entries(SPECIES), showOld = S.ui.oldSpecies || SPECIES[c.species.id]?.legacy;
+  let h = `<div class="card"><h3>Choose a species</h3><p class="small muted" style="margin:0 0 6px">Player's Handbook (2024)</p><div class="grid gauto">${all.filter(([, s]) => !s.legacy).map(card).join("")}</div>
+    <h3 style="margin-top:14px;cursor:pointer" data-act="toggleOldSpecies">${showOld ? "▾" : "▸"} More species from older books <span class="small muted">(${all.filter(([, s]) => s.legacy).length} — Hexblood, Warforged, Genasi, Tabaxi…; no ability score increases, those come from your background)</span></h3>
+    ${showOld ? `<div class="grid gauto">${all.filter(([, s]) => s.legacy).sort((a, b) => a[1].name.localeCompare(b[1].name)).map(card).join("")}</div>` : ""}</div>`;
   if (!sp) return h;
-  const slug = findPage("species", sp.name);
+  const slug = speciesSlug(sp);
   h += `<div class="card"><h3>${sp.name} options</h3>`;
   if (sp.choice) h += lineageTable(c, sp, slug);
   h += `<div class="row" style="margin-top:8px">`;
   if (sp.size.includes(" or ")) h += `<label>Size: ${sel("species.size", c.species.size || "Medium", sp.size.split(" or "))}</label>`;
   h += `</div>`;
   if (sp.pools) for (const pk in sp.pools) h += poolPicker(pk, D, c);
+  if (sp.skillChoice) h += poolPicker("spSkills", D, c);
+  if (sp.skills) h += `<p class="small"><b>Skill proficiency:</b> ${sp.skills.join(", ")}</p>`;
+  if (sp.note) h += `<p class="small"><b>Movement:</b> ${esc(sp.note)}</p>`;
+  if (sp.legacy) h += `<p class="small muted">From ${esc(sp.src)}, used with 2024 rules: ability score increases come from your background.</p>`;
   if (sp.extraOriginFeat) h += `<div style="margin-top:10px"><b>Versatile:</b> choose an origin feat ${featSelect("speciesFeat", c.speciesFeat, ["origin"])}${featPicks("speciesFeat", c.speciesFeat, D)}</div>`;
   if (sp.spellAbility) h += `<p><label><b>Spellcasting ability for these spells:</b> ${sel("species.spellAbil", c.species.spellAbil || "", [["int", "Intelligence"], ["wis", "Wisdom"], ["cha", "Charisma"]], { blank: "— choose —" })}</label>${D.speciesCast ? ` <span class="chip">Save DC ${D.speciesCast.dc} · Attack ${sgn(D.speciesCast.atk)}</span>` : ""}</p>`;
   if (sp.spells) h += `<p class="small"><b>Always known:</b> ${Object.entries(sp.spells).map(([lv, l]) => l.map(n => spellLink(n) + (+lv > 1 ? ` (level ${lv}+)` : "")).join(", ")).join(", ")}</p>`;
@@ -299,7 +308,7 @@ function poolPicker(pk, D, c, oldMax) {
   const p = D.pools[pk]; if (!p) return "";
   const cur = (c.pools[pk] || []);
   const opts = poolOptions(pk, D);
-  const isSkill = pk.startsWith("skills:") || ["skillful", "keenSenses", "skillsLore", "primalKnowledge"].includes(pk);
+  const isSkill = pk.startsWith("skills:") || ["skillful", "keenSenses", "skillsLore", "primalKnowledge", "spSkills"].includes(pk);
   const taken = isSkill ? new Set(D.profSkills.filter(s => !cur.includes(s))) : LANG_POOLS.has(pk) ? new Set((D.languages || []).filter(l => !cur.includes(l))) : new Set();
   const info = POOLS_WITH_INFO.has(pk);
   const openSet = S.ui.optOpen ||= {};
@@ -388,7 +397,7 @@ function bLevels(c, D) {
     const names = feats.map(n => n === "@sub" ? (sub ? sub.name + ": " + ((sub.features[cl] || []).join(", ") || "—") : "Subclass") : n === "@asi" ? "Ability Score Improvement" : n === "@boon" ? "Epic Boon" : n);
     h += `<div class="lvl"><div class="row"><b>Level ${i + 1}</b> — ${C.name} ${cl}<span class="muted small">${names.join(" · ")}</span>
       <span class="right small">HP: ${i === 0 ? `${C.hd} (max)` : `${inp(`levels.${i}.hp`, lv.hp ?? (C.hd / 2 + 1), { type: "number", attr: `min="1" max="${C.hd}"` })} / d${C.hd}`}</span></div>
-      ${feats.includes("@sub") && cl === Object.keys(C.features).find(k => C.features[k].includes("@sub")) * 1 ? `<div class="row" style="margin-top:6px"><label>Subclass: ${sel("subclasses." + lv.cls, c.subclasses[lv.cls], Object.entries(C.subclasses).map(([k, s]) => [k, s.name]), { blank: "— choose —" })}</label></div>` : ""}
+      ${feats.includes("@sub") && cl === Object.keys(C.features).find(k => C.features[k].includes("@sub")) * 1 ? `<div class="row" style="margin-top:6px"><label>Subclass: ${sel("subclasses." + lv.cls, c.subclasses[lv.cls], Object.entries(C.subclasses).map(([k, s]) => [k, s.name + (s.legacy ? " (2014)" : "")]), { blank: "— choose —" })}</label></div>` : ""}
       ${feats.includes("@asi") || feats.includes("@boon") ? asiEditor(`levels.${i}.asi`, lv.asi, D, feats.includes("@boon")) : ""}
     </div>`;
   });

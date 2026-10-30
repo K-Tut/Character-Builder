@@ -67,7 +67,6 @@ const Dice = {
     if (mode === "crit") dice = dice.map(d => ({ ...d, n: d.n * 2 }));
     const tag = { adv: "Advantage", dis: "Disadvantage", crit: "Critical" }[mode] || "";
     this.cur = null; this.renderAsk();
-    this.next = c.then || null;
     this.roll(c.title + (tag ? ` (${tag})` : ""), dice, flat, c.kind === "d20");
   },
 
@@ -96,7 +95,7 @@ const Dice = {
       <div class="dicerow">${res.map((r, i) => this.svg(r.s, 1 + Math.floor(Math.random() * r.s), "rolling" + (r.sign < 0 ? " neg" : ""))).join("")}</div>
       <div class="dicetotal hidden">${total}</div><div class="dicebd hidden">${breakdown}</div>
       <div class="dicenat hidden">${crit ? "NATURAL 20!" : fumble ? "Natural 1…" : ""}</div>
-      <div class="row hidden dicefoot" style="justify-content:center;margin-top:12px">${this.next ? `<button data-act="diceNext">🎲 ${crit ? "Critical damage!" : "Roll damage"}</button>` : ""}<button class="ghost" data-act="diceAgain">Roll again</button><button ${this.next ? 'class="ghost"' : ""} data-act="diceResClose">OK</button></div></div>`;
+      <div class="row hidden dicefoot" style="justify-content:center;margin-top:12px"><button class="ghost" data-act="diceAgain">Roll again</button><button data-act="diceResClose">OK</button></div></div>`;
     this.lastRoll = { title, res };
     const dies = [...el.querySelectorAll(".die")];
     const t0 = Date.now();
@@ -162,11 +161,7 @@ Object.assign(ACT, {
   diceExAdd: el => { Dice.cur.bonus = +(document.getElementById("dxb")?.value || 0); Dice.cur.extras.push({ n: +$("#dxn").value, s: +$("#dxs").value, sign: +el.dataset.g }); Dice.renderAsk(); },
   diceExDel: el => { Dice.cur.extras.splice(+el.dataset.i, 1); Dice.renderAsk(); },
   diceGo: el => Dice.go(el.dataset.m),
-  diceResClose: () => { document.getElementById("diceres").classList.add("hidden"); Dice.next = null; },
-  // attack: roll to hit first, then offer the damage roll (critical on a natural 20)
-  atk: (el, e) => { e.stopPropagation(); Dice.ask({ title: el.dataset.t + " — attack", kind: "d20", mod: +(el.dataset.m || 0), formula: "", then: el.dataset.f ? { title: el.dataset.t + " — damage", formula: el.dataset.f } : null }); },
-  diceNext: () => { const n = Dice.next, crit = (Dice.history[0] || {}).crit; document.getElementById("diceres").classList.add("hidden"); Dice.next = null; if (!n) return;
-    if (crit) { Dice.cur = { kind: "dmg", title: n.title, formula: n.formula, extras: [], bonus: 0 }; Dice.go("crit"); } else Dice.ask({ kind: "dmg", title: n.title, formula: n.formula }); },
+  diceResClose: () => { document.getElementById("diceres").classList.add("hidden"); },
   diceAgain: () => { const h = Dice.history[0]; const l = Dice.lastRoll; if (!l) return; const groups = {}; l.res.forEach(r => { const k = r.s + "|" + r.sign; groups[k] = groups[k] || { n: 0, s: r.s, sign: r.sign }; groups[k].n++; });
     const g = Object.values(groups); const d20 = l.res.find(r => r.d20); const adv = d20 && l.res.filter(r => r.d20).length === 2;
     if (adv) { const dz = g.find(x => x.s === 20); dz.keep = /Disadvantage/.test(l.title) ? "low" : "high"; }
