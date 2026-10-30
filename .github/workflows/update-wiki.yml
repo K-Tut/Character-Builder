@@ -1,0 +1,42 @@
+# "Update rules text": downloads the wiki on GitHub, encrypts it and publishes wiki.enc.
+# Start it from any device: GitHub -> Actions -> Update rules text -> Run workflow.
+name: Update rules text
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: update-wiki
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install requests beautifulsoup4 cryptography
+      - name: Download the wiki (2024 rules + older subclasses and species)
+        run: python tools/importer.py --refresh
+      - name: Encrypt into wiki.enc
+        env:
+          WIKI_PASSWORD: ${{ secrets.WIKI_PASSWORD }}
+        run: python tools/encrypt_wiki.py tools/data/wiki.json wiki.enc
+      - name: Publish
+        run: |
+          git config user.name "rules-text-bot"
+          git config user.email "rules-text-bot@users.noreply.github.com"
+          git add wiki.enc
+          git diff --cached --quiet && echo "No changes" || (git commit -m "Update rules text (wiki.enc)" && git push)
+      - name: Rebuild the website
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "(the website rebuilds by itself)"
