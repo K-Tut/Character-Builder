@@ -137,7 +137,7 @@ function renderSheet() {
   if (t === "features") c3 += sheetFeatures(c, D);
   else if (t === "spells") c3 += sheetSpells(c, D);
   else if (t === "inventory") c3 += `<div class="row">${["cp", "sp", "ep", "gp", "pp"].map(k => `<label class="small">${k.toUpperCase()} ${inp("coins." + k, +c.coins[k] || 0, { type: "number", style: "width:64px" })}</label>`).join("")}</div>
-    <table class="t" style="margin-top:8px"><tr><th>Item</th><th class="num">Qty</th><th>Notes</th><th></th></tr>${c.items.map((it, i) => `<tr><td>${inp(`items.${i}.name`, it.name, { style: "width:100%" })}</td><td class="num">${inp(`items.${i}.qty`, +it.qty || 1, { type: "number", style: "width:56px" })}</td><td>${inp(`items.${i}.note`, it.note || "", { style: "width:100%" })}</td><td><button class="small ghost" data-act="del" data-p="items" data-i="${i}">✕</button></td></tr>`).join("")}</table>
+    <table class="t" style="margin-top:8px"><tr><th>Item</th><th class="num">Qty</th><th>Notes</th><th></th></tr>${c.items.map((it, i) => `<tr><td>${inp(`items.${i}.name`, it.name, { style: "width:100%" })}</td><td class="num">${inp(`items.${i}.qty`, +it.qty || 1, { type: "number", style: "width:56px" })}</td><td>${inp(`items.${i}.note`, it.note || "", { style: "width:100%" })}</td><td style="white-space:nowrap">${it.desc || it.img ? `<button class="small ghost" data-act="itemInfo" data-i="${i}" title="Description">${it.img ? `<img src="${it.img}" style="width:22px;height:22px;object-fit:cover;border-radius:4px;vertical-align:middle">` : "ⓘ"}</button>` : ""}<button class="small ghost" data-act="del" data-p="items" data-i="${i}">✕</button></td></tr>`).join("")}</table>
     <div class="row" style="margin-top:8px"><button data-act="shopOpen">🛒 Shop</button><button class="small ghost" data-act="addItem">+ Add item by hand</button></div><p class="small muted">Armor: ${esc(D.armor.name)}${c.shield ? " + Shield" : ""} (change in Build → Equipment)</p>`;
   else if (t === "notes") c3 += `<textarea data-live="notes" style="min-height:420px">${esc(c.notes)}</textarea>`;
   else if (t === "story") c3 += `${c.storyImage ? `<img src="${c.storyImage}" style="float:right;max-width:40%;border-radius:8px;margin:0 0 8px 10px">` : ""}<div class="desc">${para(c.backstory) || '<span class="muted">Write the backstory in Build → Story.</span>'}</div>`;
@@ -192,7 +192,7 @@ function renderModalInner() {
   if (!S.modal) { bg.classList.add("hidden"); return; }
   bg.classList.remove("hidden");
   const st = box.scrollTop;
-  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk }[S.modal.type]();
+  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot }[S.modal.type]();
   box.scrollTop = st;
 }
 
@@ -631,6 +631,7 @@ $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && 
   await loadChars();
   Sync.loadToken();
   render(); renderSyncChip();
+  checkDmLoot();
   if (Sync.enabled()) Sync.run();
   if ("serviceWorker" in navigator && location.protocol === "https:") {
     // reload once when a new version of the app takes over, so the phone never keeps running old code
