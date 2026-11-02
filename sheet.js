@@ -192,7 +192,7 @@ function renderModalInner() {
   if (!S.modal) { bg.classList.add("hidden"); return; }
   bg.classList.remove("hidden");
   const st = box.scrollTop;
-  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot }[S.modal.type]();
+  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin }[S.modal.type]();
   box.scrollTop = st;
 }
 
@@ -631,7 +631,7 @@ $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && 
   await loadChars();
   Sync.loadToken();
   render(); renderSyncChip();
-  checkDmLoot();
+  if (!S.viewer) { checkDmLoot(); checkJoin(); }
   if (Sync.enabled()) Sync.run();
   if ("serviceWorker" in navigator && location.protocol === "https:") {
     // reload once when a new version of the app takes over, so the phone never keeps running old code

@@ -1,6 +1,6 @@
 // Offline cache for the app shell. Bump VERSION when files change.
-const VERSION = "v15";
-const FILES = ["./", "index.html", "style.css", "print.css", "rules.js", "legacy.js", "config.js", "app.js", "store.js", "ui.js", "print.js", "sheet.js", "dice.js", "shop.js", "dmloot.js", "manifest.json", "icon-192.png", "icon-512.png", "icon-maskable-512.png"];
+const VERSION = "v16";
+const FILES = ["./", "index.html", "style.css", "print.css", "rules.js", "legacy.js", "config.js", "app.js", "store.js", "ui.js", "print.js", "sheet.js", "dice.js", "shop.js", "dmloot.js", "mapview.js", "party.js", "manifest.json", "icon-192.png", "icon-512.png", "icon-maskable-512.png"];
 self.addEventListener("install", e => {
   // always fetch fresh copies (bypass the browser's HTTP cache) when installing a new version
   e.waitUntil(caches.open(VERSION).then(c => Promise.all(FILES.map(f => fetch(f, { cache: "no-cache" }).then(r => r.ok && c.put(f, r)).catch(() => { })))).then(() => self.skipWaiting()));

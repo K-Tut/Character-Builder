@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-02d";
+const APP_VERSION = "2026-11-02e";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -90,7 +90,9 @@ function render() { keepScroll(renderInner); }
 function renderInner() {
   const nav = $("#topnav");
   if (S.char && S.view !== "home") {
-    nav.innerHTML = [["builder", "✎ Build"], ["sheet", "▶ Play"], ["print", "⎙ Print/PDF"]].map(([v, l]) => `<button class="${S.view === v ? "on" : ""}" data-act="view" data-v="${v}">${l}</button>`).join("") + `<span class="muted small navname" style="align-self:center;margin-left:8px">${esc(S.char.name)}</span>`;
+    const tabs = [["builder", "✎ Build"], ["sheet", "▶ Play"], ["print", "⎙ Print/PDF"]];
+    if (typeof Party !== "undefined" && Party.joined && Party.joined.charId === S.char.id) tabs.splice(2, 0, ["table", `⚔ Battlemap${Party.mapNew ? ' <span class="pdot"></span>' : ""}`]);
+    nav.innerHTML = tabs.map(([v, l]) => `<button class="${S.view === v ? "on" : ""}" data-act="view" data-v="${v}">${l}</button>`).join("") + `<span class="muted small navname" style="align-self:center;margin-left:8px">${esc(S.char.name)}</span>`;
   } else nav.innerHTML = "";
   document.body.classList.toggle("printmode", S.view === "print");
   const m = $("#main");
@@ -99,7 +101,10 @@ function renderInner() {
   else if (S.view === "builder") m.innerHTML = renderBuilder();
   else if (S.view === "sheet") m.innerHTML = renderSheet();
   else if (S.view === "print") m.innerHTML = renderPrint();
+  else if (S.view === "table") { Party.mapNew = false; m.innerHTML = renderPartyTable(); }
   window.scrollTo(0, y);
+  if (S.view === "table") { bindPartyMap(); drawPartyMap(); }
+  if (typeof renderPartyChip === "function") renderPartyChip();
   renderModal();
   if (typeof Dice !== "undefined") Dice.sync();
 }
