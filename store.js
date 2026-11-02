@@ -84,6 +84,42 @@ const WikiLock = {
   }
 };
 
+// ---------- shared character folders (password protected, in the GitHub repo) ----------
+// shared/index.json lists the folders: { "folders": [{ "name": "...", "file": "shared/xyz.enc" }] }
+// Each .enc file holds { characters: [...] }, encrypted the same way as wiki.enc.
+const Shared = {
+  folders: [],
+  pwKey(f) { return "sharedPw:" + f.file; },
+  async check() {
+    let idx;
+    try { const r = await fetch("shared/index.json", { cache: "no-store" }); if (!r.ok) return; idx = await r.json(); } catch (e) { return; }
+    this.folders = (idx.folders || []).filter(f => f && f.file).map(f => ({ name: f.name || f.file, file: f.file, state: "locked", chars: [] }));
+    for (const f of this.folders) {
+      try { const r = await fetch(f.file, { cache: "no-store" }); if (!r.ok) throw 0; f.enc = await r.json(); } catch (e) { f.state = "missing"; continue; }
+      let pw = null; try { pw = localStorage.getItem(this.pwKey(f)); } catch (e) { }
+      if (pw) { try { await this.unlock(f, pw, true); } catch (e) { } }
+    }
+  },
+  async unlock(f, pw, remember) {
+    const data = await WikiLock.decrypt(f.enc, pw);
+    f.chars = (Array.isArray(data) ? data : data.characters || []).filter(c => c && c.levels && c.play);
+    f.chars.forEach(c => { try { const x = JSON.parse(JSON.stringify(c)); migrate(x); c._summary = derive(x).summary; } catch (e) { } });
+    f.state = "open";
+    try { remember ? localStorage.setItem(this.pwKey(f), pw) : localStorage.removeItem(this.pwKey(f)); } catch (e) { }
+  },
+  lock(f) { f.state = "locked"; f.chars = []; try { localStorage.removeItem(this.pwKey(f)); } catch (e) { } },
+  // copy a shared character onto this device (asks before replacing a copy that is already here)
+  async add(c, ask = true) {
+    const ex = await DB.getChar(c.id);
+    if (ex && ask && !confirm(`${c.name} is already on this device. Replace it with the shared version? (Changes made on this device are lost.)`)) return false;
+    if (ex && !ask) return false;
+    const x = JSON.parse(JSON.stringify(c)); delete x._driveId; delete x._syncedAt; delete x._summary;
+    if (ex) { x._driveId = ex._driveId; x._syncedAt = ex._syncedAt; }
+    migrate(x); x._summary = derive(x).summary;
+    await storeSaveChar(x); return true;
+  }
+};
+
 async function storeSetWiki(w, fromRemote) {
   w._updated = fromRemote ? (w._updated || Date.now()) : Date.now();
   await DB.set("wiki", w);

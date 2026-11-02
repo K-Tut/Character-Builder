@@ -56,3 +56,15 @@ It uses a hidden app folder in your Google Drive. The setup is done **once by yo
 After that, anyone on the test user list just taps **Connect Google Drive** in the app. Google shows a "not verified" warning; tap Continue. Each person syncs with **their own** Drive.
 
 When the cloud icon shows "Reconnect", tap it. Google's sign-in lasts one hour at a time.
+
+---
+
+## Shared character folders (password protected)
+
+Characters can be shared with the whole group through the GitHub repo. Everyone sees the folder on the app's home screen, opens it with the password, and taps **+ Add to my characters**. Each phone gets its own copy; changes stay on that phone.
+
+- `shared/index.json` lists the folders (name + file).
+- Each folder is one encrypted `.enc` file in `shared/` (same encryption as `wiki.enc`), so nobody can read the characters from the public repo without the password.
+- Currently: **Fantasy Grounds characters** → `shared/fantasy-grounds-characters.enc`.
+
+To add or update characters in a folder, ask Claude to rebuild the `.enc` file from an exported characters `.json` and upload it.
