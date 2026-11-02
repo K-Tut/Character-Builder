@@ -399,7 +399,7 @@ function derive(c) {
     const mastery = picked("mastery").some(m => m.startsWith(base.name + " (")) ? base.mastery : "";
     const exDice = (w.extra || "").match(/\d*d\d+(\s*[+-]\s*\d+)?/);
     const dmgFormula = ((dice === "1" && base.cat === "unarmed" && !D.cls.monk) ? String(Math.max(1, 1 + D.mod.str)) : `${dice}${dmod ? sgn(dmod) : ""}`) + (exDice ? "+" + exDice[0].replace(/\s+/g, "") : "");
-    return { dmgFormula, name: w.name || base.name, props: [base.props, mastery && "Mastery: " + mastery].filter(Boolean).join("; "), hit, dmg: dmg + (w.extra ? " + " + w.extra : ""), formula: `d20+${ABBR[ab]}${proficient ? "+Prof" : ""}${magic ? "+" + magic : ""}`, dformula: `${dice}+${ABBR[ab]}`, notes: w.notes || "" };
+    return { dmgFormula, name: w.name || base.name, mastery, ab, abMod: D.mod[ab], baseProps: base.props, props: [base.props, mastery && "Mastery: " + mastery].filter(Boolean).join("; "), hit, dmg: dmg + (w.extra ? " + " + w.extra : ""), formula: `d20+${ABBR[ab]}${proficient ? "+Prof" : ""}${magic ? "+" + magic : ""}`, dformula: `${dice}+${ABBR[ab]}`, notes: w.notes || "" };
   });
 
   D.features = collectFeatures(c, D);

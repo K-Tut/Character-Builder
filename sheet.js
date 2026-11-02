@@ -15,8 +15,8 @@ function renderSheet() {
   const hp = Math.min(P.hp ?? D.hpMax, D.hpMax);
   const pct = Math.max(0, Math.min(100, 100 * hp / D.hpMax));
   const bg = bgData(c);
-  let h = `<div class="card"><div class="hero">${c.portrait ? `<img src="${c.portrait}">` : ""}<div class="grow"><h2>${esc(c.name)}</h2>
-    <div>${esc(classLine(D))}</div><div class="muted small">${esc([D.species?.name + (c.species.choice ? " (" + c.species.choice + ")" : ""), bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div></div>
+  let h = `<div class="card"><div class="hero">${c.portrait ? `<img src="${c.thumb || c.portrait}" data-act="viewPortrait" title="Show the whole image" style="cursor:zoom-in">` : ""}<div class="grow"><h2>${esc(c.name)}</h2>
+    <div>${esc(classLine(D))}</div><div class="muted small">${esc([D.species ? D.species.name + (c.species.choice ? " (" + c.species.choice + ")" : "") : "", bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div></div>
     <div class="row"><button data-act="levelup">⬆ Level up</button><button class="ghost" data-act="shortRest">☕ Short rest</button><button class="ghost" data-act="longRest">🌙 Long rest</button>
     <button class="ghost" data-act="exportJson" title="Export this character as a file">⤓ Export</button>
     <button class="ghost ${P.inspiration ? "on" : ""}" data-act="insp" style="${P.inspiration ? "background:var(--accent-soft);border-color:var(--accent)" : ""}">${P.inspiration ? "★" : "☆"} Heroic Inspiration</button></div></div></div>`;
@@ -46,9 +46,10 @@ function renderSheet() {
   </div>
   <div class="card"><h3>Conditions</h3><div>${CONDITIONS.map(x => `<span class="chip ${P.conditions.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="cond" data-v="${x}">${x}</span>`).join("")}</div>
     <div class="row" style="margin-top:8px"><label>Exhaustion ${sel("play.exhaustion", exh, [0, 1, 2, 3, 4, 5, 6], { num: true })}</label>${exh ? `<span class="small warn">−${2 * exh} to d20 tests, −${5 * exh} ft speed${exh >= 6 ? " — DEAD" : ""}</span>` : ""}</div></div>
-  <div class="card"><h3>Attacks</h3>${D.attacks.length ? `<table class="t"><tr><th>Weapon</th><th class="num">Hit</th><th>Damage</th></tr>${D.attacks.map(a => `<tr><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.props)}</div></td><td class="num big roll" style="font-size:17px" ${R(a.name + " attack", a.hit)}>${sgn(a.hit)}</td><td class="roll" ${RD(a.name + " damage", a.dmgFormula)}>${esc(a.dmg)}</td></tr>`).join("")}</table>` : '<p class="muted small">Add weapons in Build → Equipment.</p>'}
+  <div class="card"><h3>Attacks</h3>${D.attacks.length ? `<table class="t"><tr><th>Weapon</th><th class="num">Hit</th><th>Damage</th></tr>${D.attacks.map((a, i) => `<tr><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.baseProps)}${a.mastery ? ` <span class="chip acc mastchip" data-act="mastInfo" data-i="${i}" title="What does ${esc(a.mastery)} do?">Mastery: ${esc(a.mastery)} ${(S.ui.mastOpen || {})[i] ? "▾" : "ⓘ"}</span>` : ""}</div></td><td class="num big roll" style="font-size:17px" ${R(a.name + " attack", a.hit)}>${sgn(a.hit)}</td><td class="roll" ${RD(a.name + " damage", a.dmgFormula)}>${esc(a.dmg)}</td></tr>
+      ${a.mastery && (S.ui.mastOpen || {})[i] ? `<tr class="mastrow"><td colspan="3"><div class="desc small">${masteryText(a, D)}</div></td></tr>` : ""}`).join("")}</table>` : '<p class="muted small">Add weapons in Build → Equipment.</p>'}
     ${D.cls.rogue ? `<p class="small">Sneak Attack: <b class="roll" ${RD("Sneak Attack", Math.ceil(D.cls.rogue / 2) + "d6")}>🎲 ${Math.ceil(D.cls.rogue / 2)}d6</b></p>` : ""}${D.cls.barbarian ? `<p class="small">Rage damage: <b>+${at(step({ 1: 2, 9: 3, 16: 4 }), D.cls.barbarian)}</b></p>` : ""}</div>`;
-  if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b>${esc(r.name)}</b>${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${pips(r.key, r.max, P.used[r.key])}</div>
+  if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b class="resname" data-act="resInfo" data-k="${esc(r.key)}" title="Show description">${esc(r.name)} <span class="small muted">ⓘ</span></b>${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${pips(r.key, r.max, P.used[r.key])}</div>
     ${r.forms ? `<div class="row small formrow">${(P.active || {})[r.key] ? `<span class="chip acc">Active: ${esc(P.active[r.key])}</span><a href="#" data-act="endForm" data-k="${r.key}">end</a>` : `<span class="muted">Use as:</span>${r.forms.map(f => `<button class="small ghost" data-act="useForm" data-k="${r.key}" data-f="${esc(f)}">${esc(f)}</button>`).join("")}`}</div>` : ""}`).join("")}</div>`;
   if (D.slots.length || D.pact) c2 += `<div class="card"><h3>Spell slots</h3>${D.slots.map((n, i) => `<div class="res"><span class="n">Level ${i + 1}</span>${pips("slot_" + (i + 1), n, P.slots[i + 1])}</div>`).join("")}
     ${D.pact ? `<div class="res"><span class="n">Pact slots (level ${D.pact.lvl}) <span class="small muted">short rest</span></span>${pips("pact", D.pact.n, P.pact)}</div>` : ""}</div>`;
@@ -92,7 +93,7 @@ function sheetSpells(c, D) {
   for (const l of Object.keys(groups).sort((a, b) => (a === "?" ? 99 : a) - (b === "?" ? 99 : b))) {
     const slotN = +l ? (D.slots[l - 1] || 0) : 0;
     h += `<h3 style="margin-top:12px">${l === "?" ? "Other spells" : +l ? "Level " + l : "Cantrips"} ${+l && slotN ? pips("slot_" + l, slotN, c.play.slots[l]) : ""}</h3>`;
-    h += groups[l].sort((a, b) => a.name.localeCompare(b.name)).map(s => `<div class="spell"><div class="h" data-act="toggleOpen"><b style="flex:1">${esc(s.name)}</b>${s.si?.conc ? '<span class="tag">C</span>' : ""}${s.si?.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.si?.time || "")}${s.si?.range ? " · " + esc(s.si.range) : ""}</span><span class="tag">${esc(s.src)}${s.always ? " ★" : ""}</span></div>
+    h += groups[l].sort((a, b) => a.name.localeCompare(b.name)).map(s => `<div class="spell"><div class="h" data-act="toggleOpen"><b style="flex:1">${esc(s.name)}</b>${s.si?.school ? `<span class="tag school">${esc(s.si.school)}</span>` : ""}${s.si?.conc ? '<span class="tag">C</span>' : ""}${s.si?.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.si?.time || "")}${s.si?.range ? " · " + esc(s.si.range) : ""}</span><span class="tag">${esc(s.src)}${s.always ? " ★" : ""}</span></div>
       <div class="body hidden">${s.si ? `<div class="meta">${esc([s.si.time && "Casting time: " + s.si.time, s.si.range && "Range: " + s.si.range, s.si.comp && "Components: " + s.si.comp, s.si.dur && "Duration: " + s.si.dur].filter(Boolean).join(" · "))}</div><div class="desc">${diceLinks(para(s.si.text), s.name)}</div>` : '<span class="muted small">No description imported.</span>'}</div></div>`).join("");
   }
   return h;
@@ -107,7 +108,7 @@ function renderModalInner() {
   if (!S.modal) { bg.classList.add("hidden"); return; }
   bg.classList.remove("hidden");
   const st = box.scrollTop;
-  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, shop: () => mShop() }[S.modal.type]();
+  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop }[S.modal.type]();
   box.scrollTop = st;
 }
 
@@ -138,13 +139,16 @@ function mLevelUp() {
   const feats = C.features[cl] || [];
   // subclass
   if (feats.includes("@sub") && !d.subclasses[lv.cls]) {
-    const subCard = ([k, s]) => `<div class="pick" data-act="luSub" data-k="${k}"><b>${s.name}</b><span class="small muted">${(s.features[cl] || []).join(", ")}</span>${s.legacy ? `<div class="small muted" style="font-style:italic;margin-top:2px">${esc(s.src)}</div>` : ""}</div>`;
+    const subCard = ([k, s]) => `<div class="pick ${S.ui.subPeek === k ? "peek" : ""}" data-act="luSub" data-k="${k}"><b>${s.name}</b><span class="small muted">${(s.features[cl] || []).join(", ")}</span>${s.legacy ? `<div class="small muted" style="font-style:italic;margin-top:2px">${esc(s.src)}</div>` : ""}
+      <a href="#" class="small subpeek" data-act="subPeek" data-k="${k}">${S.ui.subPeek === k ? "▾ hide features" : "▸ all features (levels 3–20)"}</a></div>`;
     const subs = Object.entries(C.subclasses), old = subs.filter(([, s]) => s.legacy);
     h += `<div class="lvl"><b>Choose your subclass:</b><div class="grid gauto" style="margin-top:6px">${subs.filter(([, s]) => !s.legacy).map(subCard).join("")}</div>
       ${old.length ? `<details style="margin-top:8px" ${S.ui.oldSubs ? "open" : ""}><summary data-act="toggleOldSubs"><b>Older subclasses</b> <span class="small muted">(${old.length}, from 2014-era books — adapted: everything they gave at level 1 or 2 comes at level 3)</span></summary>
-        <div class="grid gauto" style="margin-top:6px">${old.sort((a, b) => a[1].name.localeCompare(b[1].name)).map(subCard).join("")}</div></details>` : ""}</div>`;
+        <div class="grid gauto" style="margin-top:6px">${old.sort((a, b) => a[1].name.localeCompare(b[1].name)).map(subCard).join("")}</div></details>` : ""}
+      ${S.ui.subPeek && C.subclasses[S.ui.subPeek] ? `<div class="subpeekbox" id="subpeekbox">${subOverview(lv.cls, S.ui.subPeek, 0)}<div class="row" style="margin-top:8px"><button data-act="luSub" data-k="${S.ui.subPeek}">Choose ${esc(C.subclasses[S.ui.subPeek].name)}</button><a href="#" class="small" data-act="subPeek" data-k="${S.ui.subPeek}">close</a></div></div>` : ""}</div>`;
   } else if (feats.includes("@sub") && d.subclasses[lv.cls] && !old.subs[lv.cls]) {
-    h += `<p>Subclass: <b>${C.subclasses[d.subclasses[lv.cls]].name}</b> <a href="#" data-act="luSub" data-k="">change</a></p>`;
+    h += `<p>Subclass: <b>${C.subclasses[d.subclasses[lv.cls]].name}</b> <a href="#" data-act="luSub" data-k="">change</a></p>
+      <details class="subdet"><summary class="small"><b>📖 Everything ${esc(C.subclasses[d.subclasses[lv.cls]].name)} gives</b> (now and at later levels)</summary>${subOverview(lv.cls, d.subclasses[lv.cls], cl)}</details>`;
   }
   // features gained
   const newF = [];
@@ -182,6 +186,53 @@ function mFeature() {
    <div class="foot">${f.edited ? `<button class="ghost" data-act="featReset" style="margin-right:auto">Reset to wiki text</button>` : ""}<button class="ghost" data-act="modalClose">Cancel</button><button data-act="featSave">Save</button></div>`;
 }
 
+function mInfo() { return `<h2>${esc(S.modal.title)}</h2>${S.modal.sub ? `<p class="muted small">${esc(S.modal.sub)}</p>` : ""}<div class="desc">${S.modal.html}</div><div class="foot"><button data-act="modalClose">Close</button></div>`; }
+function mImage() { return `<div style="text-align:center"><img src="${S.char.portrait}" style="max-width:100%;max-height:78vh;border-radius:10px"></div><div class="foot"><button class="ghost" data-act="cropThumb">✂ Adjust thumbnail</button><button data-act="modalClose">Close</button></div>`; }
+// thumbnail crop: drag the picture inside the square, zoom with the slider
+function mCrop() {
+  const m = S.modal;
+  return `<h2>Thumbnail</h2><p class="small muted">Drag the picture to choose what shows in the square thumbnail (home screen and sheet). Zoom with the slider.</p>
+    <div id="cropbox" class="cropbox" style="width:${CROP_V}px;height:${CROP_V}px"><img id="cropimg" src="${m.src}" draggable="false" style="${cropStyle(m)}"></div>
+    <div class="row" style="justify-content:center;margin-top:8px"><span class="small">Zoom</span><input type="range" min="1" max="4" step="0.05" value="${m.z}" data-act-input="cropZoom" style="width:200px"></div>
+    <div class="foot"><button class="ghost" data-act="modalClose">${m.isNew ? "Use centre" : "Cancel"}</button><button data-act="cropSave">Save thumbnail</button></div>`;
+}
+const CROP_V = 260;
+function cropGeom(m) { const s0 = CROP_V / Math.min(m.w, m.h), s = s0 * m.z, dw = m.w * s, dh = m.h * s;
+  let ox = CROP_V / 2 - m.cx * dw, oy = CROP_V / 2 - m.cy * dh; ox = Math.min(0, Math.max(CROP_V - dw, ox)); oy = Math.min(0, Math.max(CROP_V - dh, oy));
+  return { s, dw, dh, ox, oy }; }
+function cropStyle(m) { const g = cropGeom(m); return `position:absolute;left:${g.ox}px;top:${g.oy}px;width:${g.dw}px;height:${g.dh}px;max-width:none;user-select:none;touch-action:none`; }
+function cropApply() { const img = $("#cropimg"); if (img) img.setAttribute("style", cropStyle(S.modal)); }
+function makeThumb(src, crop) {
+  return new Promise(res => { const img = new Image(); img.onload = () => {
+    const m = { w: img.width, h: img.height, ...crop }, g = cropGeom(m), cv = document.createElement("canvas"); cv.width = cv.height = 192;
+    cv.getContext("2d").drawImage(img, -g.ox / g.s, -g.oy / g.s, CROP_V / g.s, CROP_V / g.s, 0, 0, 192, 192); res(cv.toDataURL("image/jpeg", 0.85)); }; img.src = src; });
+}
+function openCrop(isNew) {
+  const c = S.char, cr = c.thumbCrop || { cx: 0.5, cy: 0.3, z: 1 }, img = new Image();
+  img.onload = () => openModal({ type: "crop", src: c.portrait, w: img.width, h: img.height, cx: cr.cx, cy: cr.cy, z: cr.z, isNew });
+  img.src = c.portrait;
+}
+// drag inside the crop box
+let cropDrag = null;
+document.addEventListener("pointerdown", e => { if (!e.target.closest("#cropbox") || !S.modal || S.modal.type !== "crop") return; e.preventDefault(); const g = cropGeom(S.modal); cropDrag = { x: e.clientX, y: e.clientY, cx: S.modal.cx, cy: S.modal.cy, dw: g.dw, dh: g.dh }; });
+document.addEventListener("pointermove", e => { if (!cropDrag) return; const m = S.modal; m.cx = Math.min(1, Math.max(0, cropDrag.cx - (e.clientX - cropDrag.x) / cropDrag.dw)); m.cy = Math.min(1, Math.max(0, cropDrag.cy - (e.clientY - cropDrag.y) / cropDrag.dh)); cropApply(); });
+document.addEventListener("pointerup", () => { if (!cropDrag) return; cropDrag = null; const m = S.modal, g = cropGeom(m); m.cx = (CROP_V / 2 - g.ox) / g.dw; m.cy = (CROP_V / 2 - g.oy) / g.dh; });   // keep the centre inside the picture
+// weapon masteries (2024 rules, SRD 5.2 wording shortened); the wiki text is used when imported
+const MASTERY_TEXT = {
+  Cleave: "If you hit a creature with a melee attack roll using this weapon, you can make a melee attack roll with the weapon against a second creature within 5 feet of the first that is also within your reach. On a hit, the second creature takes the weapon's damage, but don't add your ability modifier to that damage unless that modifier is negative. You can make this extra attack only once per turn.",
+  Graze: "If your attack roll with this weapon misses a creature, you can deal damage to that creature equal to the ability modifier you used to make the attack roll. This damage is the same type dealt by the weapon, and the damage can be increased only by increasing the ability modifier.",
+  Nick: "When you make the extra attack of the Light property, you can make it as part of the Attack action instead of as a Bonus Action. You can make this extra attack only once per turn.",
+  Push: "If you hit a creature with this weapon, you can push the creature up to 10 feet straight away from yourself if it is Large or smaller.",
+  Sap: "If you hit a creature with this weapon, that creature has Disadvantage on its next attack roll before the start of your next turn.",
+  Slow: "If you hit a creature with this weapon and deal damage to it, you can reduce its Speed by 10 feet until the start of your next turn. If the creature is hit more than once by weapons that have this property, the Speed reduction doesn't exceed 10 feet.",
+  Topple: "If you hit a creature with this weapon, you can force the creature to make a Constitution saving throw (DC 8 plus the ability modifier used to make the attack roll and your Proficiency Bonus). On a failed save, the creature has the Prone condition.",
+  Vex: "If you hit a creature with this weapon and deal damage to the creature, you have Advantage on your next attack roll against that creature before the end of your next turn."
+};
+function masteryText(a, D) {
+  const wiki = lookup(a.mastery), txt = wiki && wiki.length > 40 ? wiki : MASTERY_TEXT[a.mastery] || "";
+  const extra = a.mastery === "Topple" ? `<b>Your DC: ${8 + a.abMod + D.pb}</b> (8 + ${ABBR[a.ab]} ${sgn(a.abMod)} + Prof ${sgn(D.pb)})` : a.mastery === "Graze" ? `<b>Your graze damage: ${Math.max(0, a.abMod)}</b> (${ABBR[a.ab]} modifier)` : "";
+  return `<b>${esc(a.mastery)}</b> — ${para(txt) || "No description."}${extra ? `<p style="margin:4px 0 0">${extra}</p>` : ""}`;
+}
 function mShortRest() {
   const c = S.char, D = derive(c), con = D.mod.con;
   return `<h2>Short rest</h2><p>Spend Hit Dice to heal (each: roll + Con ${sgn(con)}).</p>
@@ -249,8 +300,21 @@ const ACT = {
   stdArray: () => { const D = derive(S.char); const order = [...ABILITIES].sort((a, b) => (D.startCls && CLASSES[D.startCls].primary.includes(b) ? 1 : 0) - (D.startCls && CLASSES[D.startCls].primary.includes(a) ? 1 : 0)); [15, 14, 13, 12, 10, 8].forEach((v, i) => S.char.base[order[i]] = v); save(); render(); },
   levelup: () => startLevelUp(),
   poplevel: () => { const c = S.char; const lv = c.levels.pop(); if (lv && !c.levels.some(l => l.cls === lv.cls)) delete c.subclasses[lv.cls]; else if (lv) { const D = derive(c); const C = CLASSES[lv.cls]; const subLvl = +Object.keys(C.features).find(k => C.features[k].includes("@sub")); if (D.cls[lv.cls] < subLvl) delete c.subclasses[lv.cls]; } save(); render(); },
-  img: el => pickImage((big, small) => { S.char[el.dataset.k] = big; if (el.dataset.k === "portrait") S.char.thumb = small; save(); render(); }),
-  imgdel: el => { S.char[el.dataset.k] = ""; if (el.dataset.k === "portrait") S.char.thumb = ""; save(); render(); },
+  img: el => pickImage(async (big, small) => { S.char[el.dataset.k] = big;
+    if (el.dataset.k === "portrait") { S.char.thumbCrop = { cx: 0.5, cy: 0.3, z: 1 }; S.char.thumb = await makeThumb(big, S.char.thumbCrop); save(); render(); openCrop(true); return; }
+    save(); render(); }),
+  imgdel: el => { S.char[el.dataset.k] = ""; if (el.dataset.k === "portrait") { S.char.thumb = ""; delete S.char.thumbCrop; } save(); render(); },
+  cropThumb: () => { if (S.char.portrait) openCrop(false); },
+  cropSave: async () => { const m = S.modal, g = cropGeom(m); const crop = { cx: (CROP_V / 2 - g.ox) / g.dw, cy: (CROP_V / 2 - g.oy) / g.dh, z: m.z };
+    S.char.thumbCrop = crop; S.char.thumb = await makeThumb(S.char.portrait, crop); S.modal = null; save(); render(); renderModal(); toast("Thumbnail saved"); },
+  viewPortrait: () => openModal({ type: "image" }),
+  resInfo: el => { const D = derive(S.char), r = D.resources.find(x => x.key === el.dataset.k); if (!r) return;
+    const f = D.features.find(x => norm(x.name) === norm(r.feature) || norm(x.name).startsWith(norm(r.feature) + " ") || norm(x.name).startsWith(norm(r.feature) + ":"));
+    const txt = f?.text || lookup(r.feature || r.name);
+    openModal({ type: "info", title: r.name, sub: [f?.src || r.src, r.reset === "SR" ? "recharges on a Short rest" : r.reset === "LR" ? "recharges on a Long rest" : "", r.die ? "die: " + r.die : ""].filter(Boolean).join(" · "), html: txt ? diceLinks(para(txt), r.name) : '<span class="muted">No description imported.</span>' }); },
+  mastInfo: el => { const o = S.ui.mastOpen ||= {}; o[el.dataset.i] = !o[el.dataset.i]; render(); },
+  spSchool: el => { const v = el.dataset.v, a = S.ui.spSchools || []; S.ui.spSchools = !v ? [] : a.includes(v) ? a.filter(x => x !== v) : [...a, v]; render(); },
+  subPeek: (el, e) => { e.stopPropagation(); e.preventDefault(); S.ui.subPeek = S.ui.subPeek === el.dataset.k ? null : el.dataset.k; renderModal(); },
   addWeapon: () => { const n = $("#addw").value; S.char.weapons.push({ name: n, base: n, magic: 0 }); save(); render(); },
   addItem: () => { S.char.items.push({ name: "", qty: 1, note: "" }); save(); render(); },
   addCustom: () => { (S.char.custom ||= []).push({ name: "", text: "", uses: 0, reset: "LR" }); save(); render(); },
@@ -298,7 +362,7 @@ const ACT = {
   },
   modalClose: () => { closeModal(); render(); },
   luClass: el => { const lv = S.draft.levels[S.draft.levels.length - 1]; if (lv.cls !== el.dataset.k) { lv.cls = el.dataset.k; lv.hp = null; lv.asi = null; S.draft.subclasses = clone(S.char.subclasses); S.draft.pools = clone(S.char.pools); } renderModal(); },
-  luSub: (el, e) => { e.preventDefault(); const lv = S.draft.levels[S.draft.levels.length - 1]; if (el.dataset.k) S.draft.subclasses[lv.cls] = el.dataset.k; else delete S.draft.subclasses[lv.cls]; renderModal(); },
+  luSub: (el, e) => { e.preventDefault(); if (e.target.closest(".subpeek")) return; S.ui.subPeek = null; const lv = S.draft.levels[S.draft.levels.length - 1]; if (el.dataset.k) S.draft.subclasses[lv.cls] = el.dataset.k; else delete S.draft.subclasses[lv.cls]; renderModal(); },
   rollHp: () => { const lv = S.draft.levels[S.draft.levels.length - 1]; lv.hp = rollDie(CLASSES[lv.cls].hd); renderModal(); },
   luConfirm: () => {
     const old = S.modal.oldD; const D = derive(S.draft);
@@ -369,6 +433,7 @@ const CHG = {
   asiMode: el => { const t = target(); setPath(t, el.dataset.p, el.value === "asi" ? { mode: "asi", t: "2", a1: "" } : { mode: "feat", feat: null }); },
   spellToggle: el => { const c = S.char; const n = el.dataset.n, k = el.dataset.c; const i = c.spells.findIndex(s => s.name === n && s.cls === k); if (i >= 0) c.spells.splice(i, 1); else c.spells.push({ name: n, cls: k, level: +el.dataset.l }); },
   spAll: el => { S.ui.spAll = el.checked; },
+  spClass: el => { S.ui.spClass = el.value; },
   luHp: () => { const lv = S.draft.levels[S.draft.levels.length - 1]; lv.hp = null; },
   ds: el => { const P = S.char.play; const k = el.dataset.k, i = +el.dataset.i; P.ds[k] = el.checked ? i + 1 : i; },
   showHidden: el => { S.ui.showHidden = el.checked; },
@@ -408,6 +473,7 @@ document.addEventListener("change", e => {
 document.addEventListener("input", e => {
   const el = e.target;
   if (el.dataset.live) { setPath(S.char, el.dataset.live, el.value); save(); }
+  if (el.dataset.actInput === "cropZoom" && S.modal?.type === "crop") { S.modal.z = +el.value; cropApply(); }
   if (el.dataset.actInput === "spq") { S.ui.spq = el.value; const D = derive(S.char); $("#splist").innerHTML = spellList(S.char, D, S.ui.spTab, D.casters.find(x => x.cls === S.ui.spTab)); }
 });
 $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && S.modal?.type !== "levelup") { closeModal(); render(); } });

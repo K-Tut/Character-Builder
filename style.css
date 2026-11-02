@@ -247,3 +247,24 @@ a.spl.on { background: var(--accent-soft); }
 .qty { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .qty b { min-width: 16px; text-align: center; }
 .formrow { margin: -2px 0 8px; gap: 4px; }
+
+/* subclass overview */
+.subov { padding: 6px 2px; }
+.subovl { border-left: 3px solid var(--line); padding: 2px 0 6px 10px; margin: 6px 0; }
+.subovl.have { border-color: var(--good); }
+.subovh { font-weight: 700; font-size: 13px; color: var(--accent); margin-bottom: 2px; }
+.subovl details summary { cursor: pointer; padding: 2px 0; }
+.subpeekbox { margin-top: 10px; padding: 10px 12px; border: 2px solid var(--accent); border-radius: 10px; background: var(--panel); }
+.pick.peek { border-color: var(--accent); }
+.pick .subpeek { display: block; margin-top: 6px; color: var(--accent); }
+.subdet { margin-top: 6px; }
+.subdet > summary { cursor: pointer; }
+/* spells, resources, masteries */
+.tag.school { background: var(--int); }
+.resname { cursor: pointer; }
+.resname:hover { text-decoration: underline dotted; }
+.mastchip { cursor: pointer; font-weight: 600; }
+.mastrow td { background: var(--accent-soft); border-radius: 6px; }
+/* thumbnail crop */
+.cropbox { position: relative; overflow: hidden; margin: 8px auto; border-radius: 12px; background: #222; cursor: grab; touch-action: none; box-shadow: 0 0 0 2px var(--accent); }
+.cropbox:active { cursor: grabbing; }

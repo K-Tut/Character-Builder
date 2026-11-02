@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-10-30";
+const APP_VERSION = "2026-11-02";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -179,7 +179,8 @@ function bBasics(c, D) {
   </div>
   <div class="card"><h3>Character image</h3>
     ${c.portrait ? `<img src="${c.portrait}" style="max-width:100%;max-height:380px;border-radius:8px;display:block;margin-bottom:8px">` : `<p class="muted">No image yet.</p>`}
-    <div class="row"><button data-act="img" data-k="portrait">Upload portrait</button>${c.portrait ? `<button class="ghost" data-act="imgdel" data-k="portrait">Remove</button>` : ""}</div>
+    <div class="row"><button data-act="img" data-k="portrait">Upload portrait</button>${c.portrait ? `<button class="ghost" data-act="cropThumb">✂ Adjust thumbnail</button><button class="ghost" data-act="imgdel" data-k="portrait">Remove</button>` : ""}
+      ${c.thumb ? `<span class="small muted">Thumbnail:</span><img src="${c.thumb}" style="width:48px;height:48px;border-radius:8px;object-fit:cover">` : ""}</div>
     <p class="small muted">Shown on the sheet and on page 1 of the PDF. A tall image (2:3) fits best.</p>
   </div></div>
   <div class="card"><h3>Delete character</h3><div class="row"><span class="small muted">Removes this character on all synced devices. Tip: use Export .json on the Print/PDF page first if you want a backup.</span><button class="danger right" data-act="deleteChar">🗑 Delete ${esc(c.name)}</button></div></div>`;
@@ -304,6 +305,24 @@ function optChoiceUI(pk, o, c, D) {
   if (spec.note) h += `<span class="small muted">${esc(spec.note)}</span>`;
   return h + `</div>`;
 }
+// ---------- subclass overview: everything a subclass gives, at every level ----------
+const WPROF_TXT = { martial: "Martial weapons", martialFL: "Martial weapons with Finesse or Light", martialL: "Martial weapons with Light", martialRanged: "Martial ranged weapons", simple: "Simple weapons" };
+function subOverview(cls, key, curLvl) {
+  const C = CLASSES[cls], s = C.subclasses[key]; if (!s) return "";
+  const slug = subclassSlug(cls, key), cslug = classSlug(cls);
+  const lvls = [...new Set(Object.keys(s.features).concat(Object.keys(s.spells || {})))].map(Number).sort((a, b) => a - b);
+  const profs = [(s.armor || []).join(", "), (s.wprof || []).map(w => WPROF_TXT[w] || w).join(", "), (s.tools || []).join(", "), (s.skills || []).join(", ")].filter(Boolean).join(" · ");
+  let h = `<div class="subov"><div class="row" style="margin-bottom:4px"><b style="font-size:16px">${esc(s.name)}</b>${s.legacy ? `<span class="chip">${esc(s.src)} · adapted</span>` : ""}</div>`;
+  if (profs) h += `<p class="small" style="margin:2px 0"><b>Proficiencies:</b> ${esc(profs)}</p>`;
+  h += lvls.map(l => {
+    const fs = s.features[l] || [], sp = (s.spells || {})[l] || [];
+    return `<div class="subovl ${curLvl && l <= curLvl ? "have" : ""}"><div class="subovh">Level ${l}${curLvl && l <= curLvl ? ' <span class="small muted">✓ you have this</span>' : ""}</div>
+      ${fs.map(n => `<details><summary><b>${esc(n)}</b>${s.notes?.[n] ? "" : ""}</summary><div class="desc">${para(lookup(n, [slug, cslug].filter(Boolean))) || '<span class="muted small">No description imported.</span>'}</div></details>`).join("")}
+      ${sp.length ? `<div class="small" style="margin:4px 0 2px"><b>Always prepared spells:</b> ${sp.map(n => esc(n)).join(", ")}</div>` : ""}</div>`;
+  }).join("");
+  if ((s.resources || []).length) h += `<p class="small muted" style="margin:6px 0 0">Tracked uses on the play sheet: ${s.resources.map(r => esc(r.name)).join(", ")}</p>`;
+  return h + `</div>`;
+}
 function poolPicker(pk, D, c, oldMax) {
   const p = D.pools[pk]; if (!p) return "";
   const cur = (c.pools[pk] || []);
@@ -397,7 +416,8 @@ function bLevels(c, D) {
     const names = feats.map(n => n === "@sub" ? (sub ? sub.name + ": " + ((sub.features[cl] || []).join(", ") || "—") : "Subclass") : n === "@asi" ? "Ability Score Improvement" : n === "@boon" ? "Epic Boon" : n);
     h += `<div class="lvl"><div class="row"><b>Level ${i + 1}</b> — ${C.name} ${cl}<span class="muted small">${names.join(" · ")}</span>
       <span class="right small">HP: ${i === 0 ? `${C.hd} (max)` : `${inp(`levels.${i}.hp`, lv.hp ?? (C.hd / 2 + 1), { type: "number", attr: `min="1" max="${C.hd}"` })} / d${C.hd}`}</span></div>
-      ${feats.includes("@sub") && cl === Object.keys(C.features).find(k => C.features[k].includes("@sub")) * 1 ? `<div class="row" style="margin-top:6px"><label>Subclass: ${sel("subclasses." + lv.cls, c.subclasses[lv.cls], Object.entries(C.subclasses).map(([k, s]) => [k, s.name + (s.legacy ? " (2014)" : "")]), { blank: "— choose —" })}</label></div>` : ""}
+      ${feats.includes("@sub") && cl === Object.keys(C.features).find(k => C.features[k].includes("@sub")) * 1 ? `<div class="row" style="margin-top:6px"><label>Subclass: ${sel("subclasses." + lv.cls, c.subclasses[lv.cls], Object.entries(C.subclasses).map(([k, s]) => [k, s.name + (s.legacy ? " (2014)" : "")]), { blank: "— choose —" })}</label></div>
+      ${c.subclasses[lv.cls] ? `<details class="subdet"><summary class="small"><b>📖 Everything ${esc(C.subclasses[c.subclasses[lv.cls]]?.name || "")} gives</b> (now and at later levels)</summary>${subOverview(lv.cls, c.subclasses[lv.cls], D.cls[lv.cls])}</details>` : ""}` : ""}
       ${feats.includes("@asi") || feats.includes("@boon") ? asiEditor(`levels.${i}.asi`, lv.asi, D, feats.includes("@boon")) : ""}
     </div>`;
   });
@@ -437,8 +457,13 @@ function bSpells(c, D) {
   const always = D.alwaysSpells.filter(s => s.cls === cur || (cur === "other" && s.cls === "species"));
   if (always.length) h += `<p><b>Always prepared:</b> ${always.map(s => `<span class="chip">${esc(s.name)}</span>`).join("")}</p>`;
   h += `<p><b>Chosen:</b> ${mine.map(s => `<span class="chip acc">${esc(s.name)} <a href="#" data-act="spellDel" data-n="${esc(s.name)}" data-c="${cur}">✕</a></span>`).join("") || '<span class="muted">none</span>'}</p>`;
+  const schools = [...new Set(S.idx.spellList.map(s => s.school).filter(Boolean))].sort(), fsch = S.ui.spSchools || [];
+  const lists = [...new Set(S.idx.spellList.flatMap(s => s.classes))].filter(x => CLASSES[x] || /^[a-z]+$/.test(x)).sort();
+  const classFilter = cur === "other" || S.ui.spAll;
   h += `<div class="row"><input id="spq" placeholder="Search spells…" value="${esc(S.ui.spq || "")}" data-act-input="spq" style="flex:1">
-    ${cur === "other" ? "" : `<label class="small"><input type="checkbox" data-act="spAll" ${S.ui.spAll ? "checked" : ""}> show all lists</label>`}</div>
+    ${cur === "other" ? "" : `<label class="small"><input type="checkbox" data-act="spAll" ${S.ui.spAll ? "checked" : ""}> show all lists</label>`}
+    ${classFilter && lists.length ? `<label class="small">Class list ${sel("__spcls", S.ui.spClass || "", lists.map(x => [x, CLASSES[x]?.name || cap(x)]), { blank: "all classes", attr: 'data-act="spClass"' }).replace('data-path="__spcls"', "")}</label>` : ""}</div>
+    ${schools.length ? `<div class="row small" style="margin-top:6px;gap:4px"><span class="muted">School:</span><span class="chip ${fsch.length ? "" : "acc"}" style="cursor:pointer" data-act="spSchool" data-v="">All</span>${schools.map(x => `<span class="chip ${fsch.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="spSchool" data-v="${esc(x)}">${esc(x)}</span>`).join("")}</div>` : ""}
     ${cs && !S.idx.spellList.some(s => s.classes.includes(cs.list)) && S.idx.spellList.length ? `<p class="small warn">The imported rules text has no ${esc(cs.name)} spell list, so all spells up to level ${cs.maxLvl} are shown — pick the ones on your class list.</p>` : ""}
     <div id="splist">${spellList(c, D, cur, cs)}</div>
     <div class="row" style="margin-top:10px"><span class="small muted">Not in the list?</span><input id="spman" placeholder="Spell name"><select id="spmanl">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(l => `<option value="${l}">${l ? "Level " + l : "Cantrip"}</option>`).join("")}</select><button class="small" data-act="spellAddMan" data-c="${cur}">Add</button></div></div>`;
@@ -451,7 +476,10 @@ function spellList(c, D, cur, cs) {
   const hasList = cs && S.idx.spellList.some(s => s.classes.includes(cs.list));
   if (cs && !S.ui.spAll) list = list.filter(s => (!hasList || s.classes.includes(cs.list)) && s.level <= cs.maxLvl);
   if (q) list = list.filter(s => norm(s.name).includes(q));
+  if ((cur === "other" || S.ui.spAll) && S.ui.spClass) list = list.filter(s => s.classes.includes(S.ui.spClass));
+  if ((S.ui.spSchools || []).length) list = list.filter(s => S.ui.spSchools.includes(s.school));
   const chosen = new Set(c.spells.filter(s => s.cls === cur).map(s => s.name));
+  if (!list.length) return '<p class="muted small">No spells match these filters.</p>';
   const groups = {}; list.slice(0, 400).forEach(s => (groups[s.level] ||= []).push(s));
   return Object.entries(groups).map(([lv, ss]) => `<h4 style="margin:10px 0 4px">${+lv ? "Level " + lv : "Cantrips"}</h4>` + ss.map(s => `
     <div class="spell"><div class="h"><input type="checkbox" data-act="spellToggle" data-n="${esc(s.name)}" data-l="${s.level}" data-c="${cur}" ${chosen.has(s.name) ? "checked" : ""}>
