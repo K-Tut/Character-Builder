@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-02b";
+const APP_VERSION = "2026-11-02c";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -110,7 +110,7 @@ function renderHome() {
   const imp = S.ui.import || {}; const st = S.settings || {};
   const syncOn = Sync.enabled();
   return `
-  <div class="card"><div class="row"><h2 style="margin:0">Your characters</h2><button class="right" data-act="new">+ New</button><button class="ghost" data-act="importJson">⤒ Import</button></div></div>
+  <div class="card"><div class="row"><h2 style="margin:0">Your characters</h2><button class="right" data-act="new">+ New</button><button class="ghost" data-act="importJson">⤒ Import</button><button class="ghost" data-act="exportAll" title="Save all characters in one file (Import reads it back)">⤓ Export all</button></div></div>
   <div class="chars">${S.chars.map(c => `
     <div class="card charcard" data-act="open" data-id="${esc(c.id)}">
       ${c.thumb ? `<img src="${c.thumb}">` : `<div class="ph">🛡</div>`}

@@ -295,3 +295,5 @@ a.spl.on { background: var(--accent-soft); }
 .portent .pdie.pused::after { content: ""; position: absolute; left: 4px; right: 4px; top: 50%; border-top: 2px solid #b33; transform: rotate(-35deg); }
 .freecast { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }
 .spslots { border: 1px solid var(--line, #ccc); border-radius: 10px; padding: 2px 10px 6px; margin-top: 8px; }
+.inspbtn { background: #c9a227; color: #1a1a1a; font-weight: 700; border-radius: 10px; }
+.addwpn { margin: 6px 0; padding: 6px 8px; border: 1px dashed var(--line); border-radius: 8px; }

@@ -116,7 +116,8 @@ function renderSheet() {
     <div class="row small" style="margin-top:10px"><b>Hit Dice:</b>${D.hitDice.map(x => `<span>${x.die}: ${pips("hd_" + x.die, x.n, P.hd[x.die])}</span>`).join("")}</div>
     ${hp <= 0 ? `<div class="row" style="margin-top:8px"><button class="small" ${R("Death saving throw", 0)}>🎲 Roll</button><b>Death saves</b> ✔ ${[0, 1, 2].map(i => `<input type="checkbox" data-act="ds" data-k="s" data-i="${i}" ${P.ds.s > i ? "checked" : ""}>`).join("")} ✖ ${[0, 1, 2].map(i => `<input type="checkbox" data-act="ds" data-k="f" data-i="${i}" ${P.ds.f > i ? "checked" : ""}>`).join("")}</div>` : ""}
   </div>
-  <div class="card"><div class="row"><h3 style="margin:0">Attacks</h3><button class="small ghost right" data-act="spAtkNew" title="Add an attack from one of your spells">＋ Spell attack</button></div>
+  <div class="card"><div class="row"><h3 style="margin:0">Attacks</h3><span class="right row" style="gap:6px"><button class="small ghost" data-act="wpnNew" title="Add a weapon (also goes into your equipment)">＋ Weapon</button><button class="small ghost" data-act="spAtkNew" title="Add an attack from one of your spells">＋ Spell attack</button></span></div>
+    ${S.ui.wpnAdd ? `<div class="row small addwpn"><select id="addw2">${WEAPONS.map(w => `<option>${w.name}</option>`).join("")}</select><label>Magic +<select id="addw2m">${[0, 1, 2, 3].map(n => `<option>${n}</option>`).join("")}</select></label><button class="small" data-act="wpnAdd">Add</button><a href="#" data-act="wpnNew">cancel</a></div>` : ""}
     ${D.attacks.length || D.spellAttacks.length ? `<table class="t"><tr><th>Attack</th><th class="num">Hit / DC</th><th>Damage</th></tr>${D.attacks.map((a, i) => `<tr><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.baseProps)}${a.mastery ? ` <span class="chip acc mastchip" data-act="mastInfo" data-i="${i}" title="What does ${esc(a.mastery)} do?">Mastery: ${esc(a.mastery)} ${(S.ui.mastOpen || {})[i] ? "▾" : "ⓘ"}</span>` : ""}${a.notes ? " · " + esc(a.notes) : ""}</div></td><td class="num big roll" style="font-size:17px" ${ATK("w" + i, "hit")}>${sgn(a.hit)}</td><td class="roll" ${ATK("w" + i, "dmg")}>${a.parts.map(partText).join(" + ")}</td></tr>
       ${a.mastery && (S.ui.mastOpen || {})[i] ? `<tr class="mastrow"><td colspan="3"><div class="desc small">${masteryText(a, D)}</div></td></tr>` : ""}`).join("")}
       ${D.spellAttacks.map((a, i) => `<tr><td><b>${esc(a.name)}</b> <a href="#" class="small" data-act="spAtkEdit" data-i="${i}" title="Edit">✎</a><div class="small muted">Spell${a.mode === "save" ? " · " + ABILITY_NAMES[a.save] + " save" : ""}${a.note ? " · 📝 " + esc(a.note) : ""}</div></td>
@@ -351,6 +352,15 @@ function applyFeatPick(p, v) {
   setPath(target(), p, v ? { name: v, picks: {} } : null);
 }
 // ---------- EVENTS ----------
+// save a file: share sheet on phones, download on computers
+async function shareFile(name, text, title) {
+  const file = new File([text], name, { type: "application/json" });
+  if (navigator.canShare && /Android|iPhone|iPad/i.test(navigator.userAgent) && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title }); return; } catch (e) { if (e.name === "AbortError") return; }
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name; a.click();
+  toast("Saved " + name + " to your Downloads");
+}
 const ACT = {
   home: async () => { save(true); S.view = "home"; S.char = null; await loadChars(); render(); },
   theme: () => { const r = document.documentElement; const d = r.dataset.theme === "dark" ? "light" : "dark"; r.dataset.theme = d; try { localStorage.setItem("theme", d); } catch (e) { } },
@@ -367,7 +377,8 @@ const ACT = {
     f.onchange = async () => {
       let n = 0, last = null;
       for (const file of f.files) {
-        let c; try { c = JSON.parse(await file.text()); } catch (e) { toast("Not a character file: " + file.name); continue; }
+        let data; try { data = JSON.parse(await file.text()); } catch (e) { toast("Not a character file: " + file.name); continue; }
+        for (const c of Array.isArray(data) ? data : [data]) {
         if (!c || !c.levels || !c.play) { toast("Not a character file: " + file.name); continue; }
         if (!c.id) c.id = "c" + Date.now().toString(36) + n;
         delete c._driveId; delete c._syncedAt;
@@ -375,6 +386,7 @@ const ACT = {
         if (ex && (ex._updated || 0) > (c._updated || 0) && !confirm(`The ${c.name} on this device is newer than the file. Replace it with the file anyway?`)) continue;
         if (ex) { c._driveId = ex._driveId; c._syncedAt = ex._syncedAt; }
         migrate(c); await storeSaveChar(c); n++; last = c;
+        }
       }
       await loadChars();
       if (n === 1) { S.char = last; S.view = "sheet"; }
@@ -384,13 +396,13 @@ const ACT = {
   },
   exportJson: async () => {
     const c = JSON.parse(JSON.stringify(S.char)); delete c._driveId; delete c._syncedAt;
-    const name = (c.name || "character").replace(/[^\w\- ]+/g, "").trim().replace(/ +/g, "_") + ".json";
-    const file = new File([JSON.stringify(c, null, 1)], name, { type: "application/json" });
-    if (navigator.canShare && /Android|iPhone|iPad/i.test(navigator.userAgent) && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: c.name }); return; } catch (e) { if (e.name === "AbortError") return; }
-    }
-    const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name; a.click();
-    toast("Saved " + name + " to your Downloads");
+    await shareFile((c.name || "character").replace(/[^\w\- ]+/g, "").trim().replace(/ +/g, "_") + ".json", JSON.stringify(c, null, 1), c.name);
+  },
+  exportAll: async () => {
+    if (!S.chars.length) return toast("No characters yet");
+    const all = [];
+    for (const x of S.chars) { const c = JSON.parse(JSON.stringify((await DB.getChar(x.id)) || x)); delete c._driveId; delete c._syncedAt; all.push(c); }
+    await shareFile("all-characters-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify(all, null, 1), "All characters");
   },
   deleteChar: async () => { if (!confirm("Delete " + S.char.name + " on all devices?")) return; await storeDeleteChar(S.char.id); S.char = null; S.view = "home"; await loadChars(); render(); },
   setSpecies: el => { const c = S.char; if (c.species.id !== el.dataset.id) { c.species = { id: el.dataset.id, choice: "", size: "" }; delete c.pools.keenSenses; delete c.pools.skillful; delete c.pools.spSkills; } save(); render(); },
@@ -478,6 +490,8 @@ const ACT = {
     const dmg = { title: a.name + " damage", parts: a.parts, riders: damageRiders(c, D, a), note: a.note || "" };
     if (el.dataset.k === "hit") Dice.ask({ kind: "d20", title: a.name + " attack", mod: a.hit, then: dmg });
     else Dice.ask({ kind: "dmg", ...dmg }); },
+  wpnNew: () => { S.ui.wpnAdd = !S.ui.wpnAdd; render(); },
+  wpnAdd: () => { const n = $("#addw2").value; S.char.weapons.push({ name: n, base: n, magic: +$("#addw2m").value || 0 }); S.ui.wpnAdd = false; save(); render(); toast(n + " added to your equipment"); },
   spAtkNew: () => openModal({ type: "spellAtk", i: -1, d: { spell: "", name: "", caster: derive(S.char).casters[0]?.cls || "species", mode: "atk", save: "dex", hitBonus: 0, parts: [{ f: "", type: "" }], note: "" } }),
   spAtkEdit: (el, e) => { e.preventDefault(); const i = +el.dataset.i; openModal({ type: "spellAtk", i, d: clone(S.char.spellAttacks[i]) }); },
   spAtkPart: () => { readSpAtk(); S.modal.d.parts.push({ f: "", type: S.modal.d.parts[0]?.type || "" }); renderModal(); },

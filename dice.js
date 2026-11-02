@@ -185,6 +185,7 @@ const Dice = {
       <div class="dicetotal hidden">${total}</div><div class="dicesplit hidden">${splitHtml}</div><div class="dicebd hidden">${breakdown}</div>
       <div class="dicenat hidden">${crit ? "NATURAL 20!" : fumble ? "Natural 1…" : ""}</div>
       <div class="hidden dicefoot" style="margin-top:12px"><div class="row" style="justify-content:center"><button class="ghost" data-act="diceAgain">Roll again</button><button data-act="diceResClose">OK</button></div>
+        ${res.some(r => r.d20) && S.char?.play?.inspiration ? `<div class="row" style="justify-content:center;margin-top:10px"><button class="inspbtn" data-act="diceInsp" title="Heroic Inspiration: reroll and use the new roll">★ Use Heroic Inspiration (reroll)</button></div>` : ""}
         ${nx ? `<div class="row" style="justify-content:center;margin-top:10px"><button class="hitbtn ${crit ? "crit" : ""}" data-act="diceNext">${crit ? "⚔ Critical hit → damage" : "⚔ Hit → damage"}</button></div>` : ""}</div></div>`;
     const dies = [...el.querySelectorAll(".die")];
     const t0 = Date.now();
@@ -254,6 +255,8 @@ Object.assign(ACT, {
   diceGo: el => Dice.go(el.dataset.m),
   diceResClose: () => { Dice.next = null; document.getElementById("diceres").classList.add("hidden"); },
   diceAgain: () => { const l = Dice.lastRoll; if (!l) return; Dice.roll(l.title, l.groups, l.flat, l.isD20, l.tflat); },
+  diceInsp: () => { const l = Dice.lastRoll; if (!l || !S.char) return; S.char.play.inspiration = false; save(); render();
+    Dice.roll(l.title.replace(/ — rerolled.*$/, "") + " — rerolled (Heroic Inspiration)", l.groups, l.flat, l.isD20, l.tflat); },
   diceNext: () => { const n = Dice.next, crit = (Dice.history[0] || {}).crit; Dice.next = null; if (!n) return;
     document.getElementById("diceres").classList.add("hidden"); Dice.ask({ ...n, kind: "dmg", crit: !!crit }); },
   diceRider: el => { const i = +el.dataset.i; Dice.cur.bonus = +(document.getElementById("dxb")?.value || 0); Dice.addRider(i, document.getElementById("rsl" + i)?.value); Dice.renderAsk(); },
