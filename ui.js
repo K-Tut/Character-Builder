@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-02e";
+const APP_VERSION = "2026-11-02f";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -122,6 +122,7 @@ function renderHome() {
       <div class="grow"><b>${esc(c.name)}</b><div class="muted small">${esc(c.summary || "")}</div></div>
     </div>`).join("") || `<p class="muted">No characters yet — create one!</p>`}</div>
   <p class="small muted" style="margin:4px 2px 14px">${S.server ? "Characters are also saved as files in the <b>characters</b> folder on this PC." : "Characters are saved in this app on this device."} To move one to another device: open it → <b>⤓ Export</b>, send the file, then <b>Import</b> it there.</p>
+  ${renderSharedFolders()}
 
   <div class="card" style="margin-top:20px">
     <h3>Google Drive sync <span class="chip">optional</span></h3>
@@ -146,6 +147,28 @@ function renderHome() {
     ${imp.error ? `<p class="warn">${esc(imp.error)}</p>` : ""}
   </div>
   <p class="small muted" style="text-align:center;margin:18px 0 30px">App version ${APP_VERSION} · <a href="#" data-act="updateApp">Check for updates</a></p>`;
+}
+function renderSharedFolders() {
+  if (typeof Shared === "undefined" || !Shared.folders.length) return "";
+  const mine = new Set(S.chars.map(c => c.id));
+  return Shared.folders.map((f, i) => {
+    let body;
+    if (f.state === "missing") body = `<p class="small muted">The folder file could not be loaded.</p>`;
+    else if (f.state === "locked") body = `<div class="row"><input id="sharedPw${i}" type="password" placeholder="Password" autocomplete="current-password" data-enter="sharedUnlock" data-i="${i}">
+      <label class="small"><input type="checkbox" id="sharedPwRem${i}" checked> remember on this device</label><button data-act="sharedUnlock" data-i="${i}">Open</button></div>`;
+    else {
+      const missing = f.chars.filter(c => !mine.has(c.id)).length;
+      body = `<div class="chars" style="margin-top:8px">${f.chars.map(c => `
+        <div class="card charcard" style="cursor:default">
+          ${c.thumb ? `<img src="${c.thumb}">` : `<div class="ph">🛡</div>`}
+          <div class="grow"><b>${esc(c.name)}</b><div class="muted small">${esc(c._summary || "")}</div>
+            <div style="margin-top:6px">${mine.has(c.id) ? `<span class="chip">✓ on this device</span> <a href="#" class="small" data-act="sharedAdd" data-i="${i}" data-id="${esc(c.id)}">replace with shared version</a>` : `<button class="small" data-act="sharedAdd" data-i="${i}" data-id="${esc(c.id)}">+ Add to my characters</button>`}</div></div>
+        </div>`).join("") || `<p class="muted small">This folder is empty.</p>`}</div>
+        <div class="row" style="margin-top:8px">${missing > 1 ? `<button data-act="sharedAddAll" data-i="${i}">+ Add all ${missing}</button>` : ""}<a href="#" class="small right" data-act="sharedLock" data-i="${i}">Lock folder</a></div>`;
+    }
+    return `<div class="card"><h3 style="margin:0 0 6px">📁 ${esc(f.name)} ${f.state === "open" ? "" : '<span class="chip">🔒 password</span>'}</h3>
+      <p class="small muted" style="margin:0 0 8px">Shared characters. Adding one puts your own copy on this device; changes you make stay on this device.</p>${body}</div>`;
+  }).join("");
 }
 async function pollImport() {
   const st = await (await fetch("api/import", { cache: "no-store" })).json(); S.ui.import = st;
