@@ -268,3 +268,30 @@ a.spl.on { background: var(--accent-soft); }
 /* thumbnail crop */
 .cropbox { position: relative; overflow: hidden; margin: 8px auto; border-radius: 12px; background: #222; cursor: grab; touch-action: none; box-shadow: 0 0 0 2px var(--accent); }
 .cropbox:active { cursor: grabbing; }
+
+/* ---------- damage types, riders, hit flow ---------- */
+.dti { width: 26px; height: 26px; display: inline-block; vertical-align: middle; }
+.dti.inl { width: 15px; height: 15px; margin: -2px 1px 0; opacity: .85; }
+.dicestage .dti { color: #fff; }
+.dicestage .dti .hole, .dicecard .dti .hole, .dti .hole { fill: var(--panel, #fff); }
+.dicestage .dti .hole { fill: #222; }
+.dmgsplit { display: flex; justify-content: center; align-items: flex-start; gap: 8px; font-size: 22px; font-weight: 700; margin: 2px 0 6px; }
+.dmgsplit .dpart { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.dmgsplit .dpart > span { display: flex; flex-direction: column; align-items: center; }
+.dmgsplit small { font-size: 10px; font-weight: 500; opacity: .8; text-transform: uppercase; letter-spacing: .5px; }
+.dmgsplit .dplus { padding-top: 0; }
+.dmgsplit.one { margin-top: -4px; }
+.riders { border: 1px solid var(--line, #ccc); border-radius: 10px; padding: 6px 8px; margin: 6px 0; }
+.rider { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; }
+.rider select { font-size: 12px; padding: 2px 4px; }
+.dtsel { max-width: 110px; }
+.hitbtn { background: var(--good, #2f7d4a); color: #fff; font-weight: 700; padding: 10px 22px; font-size: 16px; border-radius: 10px; }
+.hitbtn.crit { background: #c28a00; }
+.portent { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.portent .die { width: 38px; height: 38px; }
+.portent .pdie { cursor: pointer; }
+.portent .pdie.pused .die { opacity: .35; }
+.portent .pdie.pused { position: relative; }
+.portent .pdie.pused::after { content: ""; position: absolute; left: 4px; right: 4px; top: 50%; border-top: 2px solid #b33; transform: rotate(-35deg); }
+.freecast { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }
+.spslots { border: 1px solid var(--line, #ccc); border-radius: 10px; padding: 2px 10px 6px; margin-top: 8px; }

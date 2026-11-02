@@ -9,6 +9,78 @@ function pips(key, max, used, label) {
 
 const R = (title, mod) => `data-act="roll" data-k="d20" data-m="${mod}" data-t="${esc(title)}" title="Roll ${esc(title)}"`;
 const RD = (title, f) => `data-act="roll" data-k="dmg" data-f="${esc(f)}" data-t="${esc(title)}" title="Roll ${esc(title)}"`;
+const ATK = (id, k) => `data-act="atkRoll" data-at="${id}" data-k="${k}" title="${k === "hit" ? "Roll to hit" : "Roll damage"}"`;
+function slotRows(D, P) {
+  return D.slots.map((n, i) => `<div class="res"><span class="n">Level ${i + 1}</span>${pips("slot_" + (i + 1), n, P.slots[i + 1])}</div>`).join("")
+    + (D.pact ? `<div class="res"><span class="n">Pact slots (level ${D.pact.lvl}) <span class="small muted">short rest</span></span>${pips("pact", D.pact.n, P.pact)}</div>` : "");
+}
+// Portent: the rolled d20s, tap one to use it
+function portentDice(r, P) {
+  const d = (P.portent || []).slice(0, r.max);
+  return `<span class="portent">${d.length ? d.map((x, i) => `<span class="pdie ${x.u ? "pused" : ""}" data-act="portentUse" data-i="${i}" title="${x.u ? "used — tap to undo" : "tap when you use this roll"}">${Dice.svg(20, x.v, "", x.u ? "#888" : null)}</span>`).join("") : '<span class="small muted">rolled on a long rest</span>'}
+    <button class="small ghost" data-act="portentRoll" title="Roll the Portent dice now">🎲</button></span>`;
+}
+function hasSpell(c, D, name) { const n = norm(name); return D.alwaysSpells.some(s => norm(s.name) === n) || c.spells.some(s => norm(s.name) === n); }
+function attackById(D, id) { return id[0] === "w" ? D.attacks[+id.slice(1)] : D.spellAttacks[+id.slice(1)]; }
+// [name, spell level, dice, die, +dice per slot level, type]
+const SMITES = [["Divine Smite", 1, 2, 8, 1, "radiant"], ["Searing Smite", 1, 1, 6, 1, "fire"], ["Thunderous Smite", 1, 2, 6, 1, "thunder"], ["Wrathful Smite", 1, 1, 6, 1, "necrotic"],
+  ["Shining Smite", 2, 2, 6, 1, "radiant"], ["Blinding Smite", 3, 3, 8, 1, "radiant"], ["Staggering Smite", 4, 4, 6, 1, "psychic"], ["Banishing Smite", 5, 5, 10, 0, "force"]];
+// what can be added to the damage of this attack once it hits
+function damageRiders(c, D, a) {
+  const out = [], W = a.kind === "weapon", melee = W && !a.ranged, T = a.dtype || (a.parts[0] || {}).type || "";
+  const inv = (c.pools || {}).invocations || [];
+  if (melee) SMITES.forEach(([name, lvl, n, s, per, type]) => { if (hasSpell(c, D, name) || (name === "Divine Smite" && (D.cls.paladin || 0) >= 2)) out.push({ name, spell: true, lvl, n, s, per, type, freeKey: D.freeCast[norm(name)] }); });
+  if (melee && inv.includes("Eldritch Smite") && D.pact) out.push({ name: "Eldritch Smite", spell: true, pactOnly: true, lvl: 1, n: 2, s: 8, per: 1, type: "force", note: "target can be knocked Prone" });
+  if (melee && (D.cls.paladin || 0) >= 11) out.push({ name: "Radiant Strikes", n: 1, s: 8, type: "radiant", auto: true });
+  if (W && hasSpell(c, D, "Divine Favor")) out.push({ name: "Divine Favor", n: 1, s: 4, type: "radiant", note: "while the spell lasts" });
+  if (hasSpell(c, D, "Hex")) out.push({ name: "Hex", n: 1, s: 6, type: "necrotic", note: "hexed target" });
+  if (hasSpell(c, D, "Hunter's Mark") || D.cls.ranger) out.push({ name: "Hunter's Mark", n: 1, s: 6, type: "force", note: "marked target" });
+  if (W && D.cls.rogue && (a.ranged || /finesse/i.test(a.baseProps || ""))) out.push({ name: "Sneak Attack", n: Math.ceil(D.cls.rogue / 2), s: 6, type: T, note: "once per turn" });
+  if (W && D.cls.barbarian && a.ab === "str") out.push({ name: "Rage", flat: at(step({ 1: 2, 9: 3, 16: 4 }), D.cls.barbarian), type: T, note: "while raging", auto: (c.play.conditions || []).includes("Raging") });
+  if (W && D.subs.ranger && /hunter/i.test(D.subs.ranger.name)) out.push({ name: "Colossus Slayer", n: 1, s: 8, type: T, note: "target below max HP, once per turn" });
+  if (W && D.subs.barbarian && /zealot/i.test(D.subs.barbarian.name)) out.push({ name: "Divine Fury", n: 1, s: 6, plus: Math.floor(D.cls.barbarian / 2), type: "radiant", note: "first hit each turn while raging" });
+  if (W && (D.cls.cleric || 0) >= 7) out.push({ name: "Divine Strike", n: 1, s: 8, type: "radiant", note: "Blessed Strikes, once per turn" });
+  if (W && a.heavy && D.feats.some(f => f.name === "Great Weapon Master")) out.push({ name: "Great Weapon Master", flat: D.pb, type: T });
+  if (D.subs.warlock && /hexblade/i.test(D.subs.warlock.name)) out.push({ name: "Hexblade's Curse", flat: D.pb, type: T, note: "cursed target" });
+  return out;
+}
+function spellAttackPrefill(name, D) {
+  const c = S.char, si = spellInfo(name), txt = si?.text || "";
+  const own = c.spells.find(s => s.name === name) || D.alwaysSpells.find(s => s.name === name);
+  const caster = own ? (own.cls === "species" ? "species" : own.cls) : (D.casters[0]?.cls || "species");
+  const ab = { strength: "str", dexterity: "dex", constitution: "con", intelligence: "int", wisdom: "wis", charisma: "cha" };
+  const sv = txt.match(/(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) saving throw/i);
+  const mode = /spell attack/i.test(txt) ? "atk" : sv ? "save" : "atk";
+  const m = txt.match(new RegExp("(\\d+)d(\\d+)(?:\\s*\\+\\s*(\\d+))?\\s+(" + DMG_TYPES.join("|") + ")\\s+damage", "i"));
+  const lvl = si?.level ?? own?.level;
+  return { spell: name, name, caster: D.casters.some(x => x.cls === caster) || caster === "species" ? caster : (D.casters[0]?.cls || "species"), mode, save: sv ? ab[sv[1].toLowerCase()] : "dex",
+    hitBonus: 0, parts: [{ f: m ? `${m[1]}d${m[2]}${m[3] ? "+" + m[3] : ""}` : "", type: m ? m[4].toLowerCase() : "" }], cantrip: lvl === 0,
+    addMod: /eldritch blast/i.test(name) && ((c.pools || {}).invocations || []).includes("Agonizing Blast"), note: mode === "save" && /half as much/i.test(txt) ? "half damage on a successful save" : "" };
+}
+function mSpellAtk() {
+  const c = S.char, D = derive(c), d = S.modal.d;
+  const names = [...new Set([...D.alwaysSpells.map(s => s.name), ...c.spells.map(s => s.name)])].sort();
+  const casters = [...D.casters.map(x => [x.cls, `${x.name} (${ABBR[x.ability]}) · atk ${sgn(x.atk)} · DC ${x.dc}`]), ...(D.speciesCast ? [["species", `${D.speciesCast.name} (${ABBR[D.speciesCast.ability]}) · atk ${sgn(D.speciesCast.atk)} · DC ${D.speciesCast.dc}`]] : [])];
+  const cs = D.casters.find(x => x.cls === d.caster) || (d.caster === "species" && D.speciesCast) || D.casters[0] || D.speciesCast || { atk: D.pb, dc: 8 + D.pb };
+  return `<h2>${S.modal.i >= 0 ? "Edit" : "Add"} spell attack</h2>
+    <div class="grid g2"><label>Spell<select id="sa_spell" data-act="spAtkSpell"><option value="">— choose —</option>${names.map(n => `<option ${n === d.spell ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label>
+      <label>Name on the sheet<input id="sa_name" value="${esc(d.name || "")}"></label>
+      <label>Casting ability<select id="sa_caster" data-act="spAtkMode">${casters.map(([k, l]) => `<option value="${k}" ${k === d.caster ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
+      <label>Roll<select id="sa_mode" data-act="spAtkMode"><option value="atk" ${d.mode === "atk" ? "selected" : ""}>Spell attack (to hit ${sgn(cs.atk + (+d.hitBonus || 0))})</option><option value="save" ${d.mode === "save" ? "selected" : ""}>Saving throw (DC ${cs.dc + (+d.hitBonus || 0)})</option></select></label>
+      ${d.mode === "save" ? `<label>Save<select id="sa_save">${ABILITIES.map(a => `<option value="${a}" ${a === d.save ? "selected" : ""}>${ABILITY_NAMES[a]}</option>`).join("")}</select></label>` : ""}
+      <label>Extra ${d.mode === "save" ? "DC" : "to hit"} <input id="sa_hit" type="number" value="${+d.hitBonus || 0}" style="width:80px"></label></div>
+    <h3 style="margin-top:12px">Damage</h3>
+    ${d.parts.map((p, i) => `<div class="row" style="margin-bottom:4px"><input class="sa_f" value="${esc(p.f)}" placeholder="${i ? "+1d4 or +3" : "e.g. 1d10"}" style="width:120px">${dtSelect("sa_t" + i, p.type)}${i ? `<button class="small ghost" data-act="spAtkPartDel" data-i="${i}">✕</button>` : `<span class="small muted">${d.cantrip ? "cantrip — grows at levels 5, 11, 17" : ""}</span>`}</div>`).join("")}
+    <div class="row"><button class="small ghost" data-act="spAtkPart">＋ add damage (dice or a flat +X, any type)</button><label class="small"><input type="checkbox" id="sa_mod" ${d.addMod ? "checked" : ""}> add ${ABBR[cs.ability || "int"]} modifier to the damage</label></div>
+    <label style="display:block;margin-top:10px">Note<input id="sa_note" value="${esc(d.note || "")}" placeholder="e.g. +3 to damage once per round"></label>
+    <div class="foot">${S.modal.i >= 0 ? `<button class="danger" data-act="spAtkDel" style="margin-right:auto">Delete</button>` : ""}<button class="ghost" data-act="modalClose">Cancel</button><button data-act="spAtkSave">Save</button></div>`;
+}
+function readSpAtk() {
+  const d = S.modal.d, v = id => document.getElementById(id);
+  d.name = v("sa_name").value.trim(); d.caster = v("sa_caster").value; d.mode = v("sa_mode").value; if (v("sa_save")) d.save = v("sa_save").value;
+  d.hitBonus = +v("sa_hit").value || 0; d.addMod = v("sa_mod").checked; d.note = v("sa_note").value;
+  d.parts = [...document.querySelectorAll(".sa_f")].map((el, i) => ({ f: el.value.trim().replace(/^\+/, ""), type: v("sa_t" + i).value }));
+}
 function renderSheet() {
   const c = S.char, D = derive(c), P = c.play;
   if (!D.level) return `<div class="card"><h2>${esc(c.name)}</h2><p>This character has no class levels yet.</p><button data-act="levelup">Choose first class</button> <button class="ghost" data-act="view" data-v="builder">Open builder</button></div>`;
@@ -44,15 +116,19 @@ function renderSheet() {
     <div class="row small" style="margin-top:10px"><b>Hit Dice:</b>${D.hitDice.map(x => `<span>${x.die}: ${pips("hd_" + x.die, x.n, P.hd[x.die])}</span>`).join("")}</div>
     ${hp <= 0 ? `<div class="row" style="margin-top:8px"><button class="small" ${R("Death saving throw", 0)}>🎲 Roll</button><b>Death saves</b> ✔ ${[0, 1, 2].map(i => `<input type="checkbox" data-act="ds" data-k="s" data-i="${i}" ${P.ds.s > i ? "checked" : ""}>`).join("")} ✖ ${[0, 1, 2].map(i => `<input type="checkbox" data-act="ds" data-k="f" data-i="${i}" ${P.ds.f > i ? "checked" : ""}>`).join("")}</div>` : ""}
   </div>
-  <div class="card"><h3>Conditions</h3><div>${CONDITIONS.map(x => `<span class="chip ${P.conditions.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="cond" data-v="${x}">${x}</span>`).join("")}</div>
-    <div class="row" style="margin-top:8px"><label>Exhaustion ${sel("play.exhaustion", exh, [0, 1, 2, 3, 4, 5, 6], { num: true })}</label>${exh ? `<span class="small warn">−${2 * exh} to d20 tests, −${5 * exh} ft speed${exh >= 6 ? " — DEAD" : ""}</span>` : ""}</div></div>
-  <div class="card"><h3>Attacks</h3>${D.attacks.length ? `<table class="t"><tr><th>Weapon</th><th class="num">Hit</th><th>Damage</th></tr>${D.attacks.map((a, i) => `<tr><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.baseProps)}${a.mastery ? ` <span class="chip acc mastchip" data-act="mastInfo" data-i="${i}" title="What does ${esc(a.mastery)} do?">Mastery: ${esc(a.mastery)} ${(S.ui.mastOpen || {})[i] ? "▾" : "ⓘ"}</span>` : ""}</div></td><td class="num big roll" style="font-size:17px" ${R(a.name + " attack", a.hit)}>${sgn(a.hit)}</td><td class="roll" ${RD(a.name + " damage", a.dmgFormula)}>${esc(a.dmg)}</td></tr>
-      ${a.mastery && (S.ui.mastOpen || {})[i] ? `<tr class="mastrow"><td colspan="3"><div class="desc small">${masteryText(a, D)}</div></td></tr>` : ""}`).join("")}</table>` : '<p class="muted small">Add weapons in Build → Equipment.</p>'}
+  <div class="card"><div class="row"><h3 style="margin:0">Attacks</h3><button class="small ghost right" data-act="spAtkNew" title="Add an attack from one of your spells">＋ Spell attack</button></div>
+    ${D.attacks.length || D.spellAttacks.length ? `<table class="t"><tr><th>Attack</th><th class="num">Hit / DC</th><th>Damage</th></tr>${D.attacks.map((a, i) => `<tr><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.baseProps)}${a.mastery ? ` <span class="chip acc mastchip" data-act="mastInfo" data-i="${i}" title="What does ${esc(a.mastery)} do?">Mastery: ${esc(a.mastery)} ${(S.ui.mastOpen || {})[i] ? "▾" : "ⓘ"}</span>` : ""}${a.notes ? " · " + esc(a.notes) : ""}</div></td><td class="num big roll" style="font-size:17px" ${ATK("w" + i, "hit")}>${sgn(a.hit)}</td><td class="roll" ${ATK("w" + i, "dmg")}>${a.parts.map(partText).join(" + ")}</td></tr>
+      ${a.mastery && (S.ui.mastOpen || {})[i] ? `<tr class="mastrow"><td colspan="3"><div class="desc small">${masteryText(a, D)}</div></td></tr>` : ""}`).join("")}
+      ${D.spellAttacks.map((a, i) => `<tr><td><b>${esc(a.name)}</b> <a href="#" class="small" data-act="spAtkEdit" data-i="${i}" title="Edit">✎</a><div class="small muted">Spell${a.mode === "save" ? " · " + ABILITY_NAMES[a.save] + " save" : ""}${a.note ? " · 📝 " + esc(a.note) : ""}</div></td>
+        ${a.mode === "save" ? `<td class="num" style="font-size:15px"><b>DC ${a.dc}</b><div class="small muted">${ABBR[a.save]}</div></td>` : `<td class="num big roll" style="font-size:17px" ${ATK("s" + i, "hit")}>${sgn(a.hit)}</td>`}
+        <td class="roll" ${ATK("s" + i, "dmg")}>${a.parts.map(partText).join(" + ") || '<span class="muted">—</span>'}</td></tr>`).join("")}</table>
+      <p class="small muted" style="margin:6px 0 0">🎲 Tap the hit bonus to attack — on a hit tap “Hit” to roll damage (with smites, Hex …).</p>` : '<p class="muted small">Add weapons in Build → Equipment, or ＋ a spell attack.</p>'}
     ${D.cls.rogue ? `<p class="small">Sneak Attack: <b class="roll" ${RD("Sneak Attack", Math.ceil(D.cls.rogue / 2) + "d6")}>🎲 ${Math.ceil(D.cls.rogue / 2)}d6</b></p>` : ""}${D.cls.barbarian ? `<p class="small">Rage damage: <b>+${at(step({ 1: 2, 9: 3, 16: 4 }), D.cls.barbarian)}</b></p>` : ""}</div>`;
-  if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b class="resname" data-act="resInfo" data-k="${esc(r.key)}" title="Show description">${esc(r.name)} <span class="small muted">ⓘ</span></b>${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${pips(r.key, r.max, P.used[r.key])}</div>
+  if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b class="resname" data-act="resInfo" data-k="${esc(r.key)}" title="Show description">${esc(r.name)} <span class="small muted">ⓘ</span></b>${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${r.key === "portent" ? portentDice(r, P) : pips(r.key, r.max, P.used[r.key])}</div>
     ${r.forms ? `<div class="row small formrow">${(P.active || {})[r.key] ? `<span class="chip acc">Active: ${esc(P.active[r.key])}</span><a href="#" data-act="endForm" data-k="${r.key}">end</a>` : `<span class="muted">Use as:</span>${r.forms.map(f => `<button class="small ghost" data-act="useForm" data-k="${r.key}" data-f="${esc(f)}">${esc(f)}</button>`).join("")}`}</div>` : ""}`).join("")}</div>`;
-  if (D.slots.length || D.pact) c2 += `<div class="card"><h3>Spell slots</h3>${D.slots.map((n, i) => `<div class="res"><span class="n">Level ${i + 1}</span>${pips("slot_" + (i + 1), n, P.slots[i + 1])}</div>`).join("")}
-    ${D.pact ? `<div class="res"><span class="n">Pact slots (level ${D.pact.lvl}) <span class="small muted">short rest</span></span>${pips("pact", D.pact.n, P.pact)}</div>` : ""}</div>`;
+  if (D.slots.length || D.pact) c2 += `<div class="card"><h3>Spell slots</h3>${slotRows(D, P)}</div>`;
+  c2 += `<div class="card"><h3>Conditions</h3><div>${CONDITIONS.map(x => `<span class="chip ${P.conditions.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="cond" data-v="${x}">${x}</span>`).join("")}</div>
+    <div class="row" style="margin-top:8px"><label>Exhaustion ${sel("play.exhaustion", exh, [0, 1, 2, 3, 4, 5, 6], { num: true })}</label>${exh ? `<span class="small warn">−${2 * exh} to d20 tests, −${5 * exh} ft speed${exh >= 6 ? " — DEAD" : ""}</span>` : ""}</div></div>`;
 
   // column 3: tabs
   const t = S.sheetTab;
@@ -82,6 +158,13 @@ function sheetFeatures(c, D) {
   return `<div class="row small"><span class="muted">Click a feature to expand.</span><label class="right"><input type="checkbox" data-act="showHidden" ${S.ui.showHidden ? "checked" : ""}> show hidden (${nh})</label></div>
     <h3 style="margin-top:10px">Active</h3>${act.map(featRow).join("") || '<p class="muted small">—</p>'}<h3 style="margin-top:14px">Passive</h3>${pas.map(featRow).join("") || '<p class="muted small">—</p>'}`;
 }
+function freeRes(name, D) { const k = D.freeCast[norm(name)]; return k ? D.allResources.find(r => r.key === k) : null; }
+function freePips(name, D, c) { const r = freeRes(name, D); return r && r.max > 0 ? `<span class="freecast" title="Cast without a spell slot (${esc(r.name)})"><span class="small muted">free</span>${pips(r.key, r.max, c.play.used[r.key])}</span>` : ""; }
+function freeToggle(name, D, c) {
+  const mine = (c.freeCasts || []).includes(name), r = freeRes(name, D);
+  if (r && !mine) return `<div class="small muted" style="margin-bottom:6px">Free cast without a slot: ${esc(r.src || r.name)} (${r.reset === "SR" ? "short rest" : "long rest"})</div>`;
+  return `<label class="small" style="display:block;margin-bottom:6px"><input type="checkbox" data-act="freeToggle" data-n="${esc(name)}" ${mine ? "checked" : ""}> I can cast this once per long rest without a spell slot (feat, item …)</label>`;
+}
 function sheetSpells(c, D) {
   const groups = {};
   const add = (name, src, always, lvlHint) => { const si = spellInfo(name); const l = si?.level ?? lvlHint ?? "?"; (groups[l] ||= []).push({ name, src, always, si }); };
@@ -89,12 +172,12 @@ function sheetSpells(c, D) {
   c.spells.forEach(s => add(s.name, s.cls === "other" ? "Other" : CLASSES[s.cls]?.name || s.cls, false, s.level));
   let h = D.casters.map(cs => `<span class="chip acc roll" ${R(cs.name + " spell attack", cs.atk)}>${cs.name}: DC ${cs.dc} · Atk ${sgn(cs.atk)} 🎲</span>`).join("")
     + (D.speciesCast && D.alwaysSpells.some(s => s.cls === "species") ? `<span class="chip acc roll" ${R(D.speciesCast.name + " spell attack", D.speciesCast.atk)}>${esc(D.speciesCast.name)} spells: DC ${D.speciesCast.dc} · Atk ${sgn(D.speciesCast.atk)} (${ABBR[D.speciesCast.ability]}) 🎲</span>` : "") + `<button class="small ghost" data-act="goSpells" style="margin-left:6px">Change spells</button>`;
+  if (D.slots.length || D.pact) h += `<div class="spslots"><h3 style="margin:10px 0 4px">Spell slots</h3>${slotRows(D, c.play)}</div>`;
   if (!Object.keys(groups).length) return h + `<p class="muted">No spells.</p>`;
   for (const l of Object.keys(groups).sort((a, b) => (a === "?" ? 99 : a) - (b === "?" ? 99 : b))) {
-    const slotN = +l ? (D.slots[l - 1] || 0) : 0;
-    h += `<h3 style="margin-top:12px">${l === "?" ? "Other spells" : +l ? "Level " + l : "Cantrips"} ${+l && slotN ? pips("slot_" + l, slotN, c.play.slots[l]) : ""}</h3>`;
-    h += groups[l].sort((a, b) => a.name.localeCompare(b.name)).map(s => `<div class="spell"><div class="h" data-act="toggleOpen"><b style="flex:1">${esc(s.name)}</b>${s.si?.school ? `<span class="tag school">${esc(s.si.school)}</span>` : ""}${s.si?.conc ? '<span class="tag">C</span>' : ""}${s.si?.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.si?.time || "")}${s.si?.range ? " · " + esc(s.si.range) : ""}</span><span class="tag">${esc(s.src)}${s.always ? " ★" : ""}</span></div>
-      <div class="body hidden">${s.si ? `<div class="meta">${esc([s.si.time && "Casting time: " + s.si.time, s.si.range && "Range: " + s.si.range, s.si.comp && "Components: " + s.si.comp, s.si.dur && "Duration: " + s.si.dur].filter(Boolean).join(" · "))}</div><div class="desc">${diceLinks(para(s.si.text), s.name)}</div>` : '<span class="muted small">No description imported.</span>'}</div></div>`).join("");
+    h += `<h3 style="margin-top:12px">${l === "?" ? "Other spells" : +l ? "Level " + l : "Cantrips"}</h3>`;
+    h += groups[l].sort((a, b) => a.name.localeCompare(b.name)).map(s => `<div class="spell"><div class="h" data-act="toggleOpen"><b style="flex:1">${esc(s.name)}</b>${s.si?.school ? `<span class="tag school">${esc(s.si.school)}</span>` : ""}${s.si?.conc ? '<span class="tag">C</span>' : ""}${s.si?.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.si?.time || "")}${s.si?.range ? " · " + esc(s.si.range) : ""}</span><span class="tag">${esc(s.src)}${s.always ? " ★" : ""}</span>${freePips(s.name, D, c)}</div>
+      <div class="body hidden">${+l ? freeToggle(s.name, D, c) : ""}${s.si ? `<div class="meta">${esc([s.si.time && "Casting time: " + s.si.time, s.si.range && "Range: " + s.si.range, s.si.comp && "Components: " + s.si.comp, s.si.dur && "Duration: " + s.si.dur].filter(Boolean).join(" · "))}</div><div class="desc">${diceLinks(para(s.si.text), s.name)}</div>` : '<span class="muted small">No description imported.</span>'}</div></div>`).join("");
   }
   return h;
 }
@@ -108,7 +191,7 @@ function renderModalInner() {
   if (!S.modal) { bg.classList.add("hidden"); return; }
   bg.classList.remove("hidden");
   const st = box.scrollTop;
-  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop }[S.modal.type]();
+  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk }[S.modal.type]();
   box.scrollTop = st;
 }
 
@@ -178,14 +261,35 @@ function mLevelUp() {
   return h + `<div class="foot">${missing.length ? `<span class="warn small" style="margin-right:auto">Still to choose: ${missing.join(", ")}</span>` : ""}<button class="ghost" data-act="modalClose">Cancel</button><button data-act="luConfirm">Confirm level ${i + 1}</button></div>`;
 }
 
+function rollPortent(D) { const r = D.resources.find(x => x.key === "portent"); if (!r) return ""; const P = S.char.play; P.portent = Array.from({ length: r.max }, () => ({ v: rollDie(20), u: false })); P.used.portent = 0; return P.portent.map(x => x.v).join(", "); }
+function featResources(D, f) {
+  const n = norm(f.name);
+  return D.allResources.filter(r => r.featKey === f.key || (!r.manual && r.feature && (norm(r.feature) === n || n.startsWith(norm(r.feature) + " "))));
+}
 function mFeature() {
-  const D = derive(S.char); const f = D.features.find(x => x.key === S.modal.key); if (!f) return "";
+  const c = S.char, D = derive(c); const f = D.features.find(x => x.key === S.modal.key); if (!f) return "";
+  const rs = featResources(D, f), RS = { LR: "Long rest", SR: "Short rest", "": "never" };
+  const resetSel = (cls, i, v) => `<select class="${cls}" data-i="${i}">${Object.entries(RS).map(([k, l]) => `<option value="${k}" ${k === (v ?? "LR") ? "selected" : ""}>${l}</option>`).join("")}</select>`;
   return `<h2>${esc(f.name)}</h2><p class="muted small">${esc(f.src)}${f.edited ? " · edited by you" : ""}</p>
-   <textarea id="fetext" style="min-height:280px">${esc(f.text)}</textarea>
-   <div class="row" style="margin-top:8px"><label><input type="checkbox" id="feact" ${f.active ? "checked" : ""}> Active (has uses / action) — otherwise Passive</label><label><input type="checkbox" id="fehid" ${f.hidden ? "checked" : ""}> Hide from sheet & PDF</label></div>
+   <textarea id="fetext" style="min-height:240px">${esc(S.modal.text ?? f.text)}</textarea>
+   <div class="row" style="margin-top:8px"><label><input type="checkbox" id="feact" ${(S.modal.act ?? f.active) ? "checked" : ""}> Active (has uses / action) — otherwise Passive</label><label><input type="checkbox" id="fehid" ${(S.modal.hid ?? f.hidden) ? "checked" : ""}> Hide from sheet & PDF</label></div>
+   <h3 style="margin-top:14px">Uses (red dots on the sheet)</h3>
+   ${rs.length ? `<table class="t small"><tr><th>Resource</th><th class="num">Uses</th><th>Recharge</th><th></th></tr>${rs.map(r => r.manual
+      ? `<tr><td><input class="frn" data-i="${r.idx}" value="${esc(r.name)}"></td><td class="num"><input class="fru" data-i="${r.idx}" type="number" min="0" value="${r.max}" style="width:64px"></td><td>${resetSel("frr", r.idx, r.reset)}</td><td><button class="small ghost" data-act="featResDel" data-i="${r.idx}">✕</button></td></tr>`
+      : `<tr><td>${esc(r.name)}${r.overridden ? ' <span class="chip warn">changed</span>' : ""}</td><td class="num"><input class="rmx" data-k="${esc(r.key)}" data-def="${r.baseMax}" type="number" min="0" value="${r.max}" style="width:64px"></td><td>${RS[r.reset] || esc(r.reset || "")}</td><td class="small muted">rules: ${r.baseMax}</td></tr>`).join("")}</table>
+      <p class="small muted">Set uses to 0 to hide a resource. Put the rules number back to undo a change.</p>` : '<p class="small muted">This feature has no uses tracked yet.</p>'}
+   <button class="small ghost" data-act="featResAdd">＋ Add a resource for this feature</button>
    <div class="foot">${f.edited ? `<button class="ghost" data-act="featReset" style="margin-right:auto">Reset to wiki text</button>` : ""}<button class="ghost" data-act="modalClose">Cancel</button><button data-act="featSave">Save</button></div>`;
 }
-
+// keep typed text when the feature dialog re-renders
+function keepFeatForm() { const m = S.modal; m.text = $("#fetext").value; m.act = $("#feact").checked; m.hid = $("#fehid").checked; readFeatRes(); }
+function readFeatRes() {
+  const c = S.char, k = S.modal.key, arr = (c.featRes || {})[k] || [];
+  document.querySelectorAll(".frn").forEach(el => { const r = arr[+el.dataset.i]; if (r) r.name = el.value; });
+  document.querySelectorAll(".fru").forEach(el => { const r = arr[+el.dataset.i]; if (r) r.uses = +el.value || 0; });
+  document.querySelectorAll(".frr").forEach(el => { const r = arr[+el.dataset.i]; if (r) r.reset = el.value; });
+  document.querySelectorAll(".rmx").forEach(el => { const m = c.resMax ||= {}; if (el.value === "" || +el.value === +el.dataset.def) delete m[el.dataset.k]; else m[el.dataset.k] = +el.value; });
+}
 function mInfo() { return `<h2>${esc(S.modal.title)}</h2>${S.modal.sub ? `<p class="muted small">${esc(S.modal.sub)}</p>` : ""}<div class="desc">${S.modal.html}</div><div class="foot"><button data-act="modalClose">Close</button></div>`; }
 function mImage() { return `<div style="text-align:center"><img src="${S.char.portrait}" style="max-width:100%;max-height:78vh;border-radius:10px"></div><div class="foot"><button class="ghost" data-act="cropThumb">✂ Adjust thumbnail</button><button data-act="modalClose">Close</button></div>`; }
 // thumbnail crop: drag the picture inside the square, zoom with the slider
@@ -345,7 +449,8 @@ const ACT = {
     const P = S.char.play, D = derive(S.char);
     Object.assign(P, { hp: D.hpMax, temp: 0, used: {}, slots: {}, pact: 0, hd: {}, ds: { s: 0, f: 0 }, active: {}, exhaustion: Math.max(0, (+P.exhaustion || 0) - 1) });
     P.conditions = P.conditions.filter(x => x !== "Raging" && x !== "Concentrating");
-    save(); render(); toast("Long rest complete");
+    const pr = rollPortent(D);
+    save(); render(); toast("Long rest complete" + (pr ? " · Portent: " + pr : ""));
   },
   shortRest: () => openModal({ type: "shortRest" }),
   hdRoll: el => {
@@ -369,13 +474,28 @@ const ACT = {
     const P = S.draft.play; P.hp = Math.min(D.hpMax, (P.hp ?? old.hpMax) + (D.hpMax - old.hpMax));
     S.char = S.draft; closeModal(); save(true); render(); toast(`Level ${D.level}! Max HP ${D.hpMax}`);
   },
+  atkRoll: (el, e) => { e.stopPropagation(); const c = S.char, D = derive(c), a = attackById(D, el.dataset.at); if (!a) return;
+    const dmg = { title: a.name + " damage", parts: a.parts, riders: damageRiders(c, D, a), note: a.note || "" };
+    if (el.dataset.k === "hit") Dice.ask({ kind: "d20", title: a.name + " attack", mod: a.hit, then: dmg });
+    else Dice.ask({ kind: "dmg", ...dmg }); },
+  spAtkNew: () => openModal({ type: "spellAtk", i: -1, d: { spell: "", name: "", caster: derive(S.char).casters[0]?.cls || "species", mode: "atk", save: "dex", hitBonus: 0, parts: [{ f: "", type: "" }], note: "" } }),
+  spAtkEdit: (el, e) => { e.preventDefault(); const i = +el.dataset.i; openModal({ type: "spellAtk", i, d: clone(S.char.spellAttacks[i]) }); },
+  spAtkPart: () => { readSpAtk(); S.modal.d.parts.push({ f: "", type: S.modal.d.parts[0]?.type || "" }); renderModal(); },
+  spAtkPartDel: el => { readSpAtk(); S.modal.d.parts.splice(+el.dataset.i, 1); renderModal(); },
+  spAtkSave: () => { readSpAtk(); const d = S.modal.d; if (!d.spell && !d.name) return toast("Choose a spell first");
+    const arr = S.char.spellAttacks ||= []; if (S.modal.i >= 0) arr[S.modal.i] = d; else arr.push(d); closeModal(); save(); render(); },
+  spAtkDel: () => { S.char.spellAttacks.splice(S.modal.i, 1); closeModal(); save(); render(); },
+  portentUse: el => { const P = S.char.play, x = (P.portent || [])[+el.dataset.i]; if (!x) return; x.u = !x.u; P.used.portent = P.portent.filter(y => y.u).length; save(); render(); },
+  portentRoll: () => { if ((S.char.play.portent || []).some(x => !x.u) && !confirm("Re-roll your Portent dice?")) return; const r = rollPortent(derive(S.char)); save(); render(); toast("Portent: " + r); },
+  featResAdd: () => { keepFeatForm(); const c = S.char, D = derive(c), f = D.features.find(x => x.key === S.modal.key); ((c.featRes ||= {})[S.modal.key] ||= []).push({ name: f ? f.name : "Uses", uses: 1, reset: "LR", feature: f?.name }); save(); render(); renderModal(); },
+  featResDel: el => { keepFeatForm(); const arr = S.char.featRes[S.modal.key]; arr.splice(+el.dataset.i, 1); if (!arr.length) delete S.char.featRes[S.modal.key]; save(); render(); renderModal(); },
   featEdit: (el, e) => { e.stopPropagation(); openModal({ type: "feature", key: el.dataset.k }); },
   featSave: () => {
     const D = derive(S.char); const f = D.features.find(x => x.key === S.modal.key);
     const m = S.char.featureMeta[f.key] ||= {}; const t = $("#fetext").value;
     const orig = collectFeatures({ ...S.char, featureMeta: {} }, D).find(x => x.key === f.key);
     if (t !== (orig?.text || "")) m.text = t; else delete m.text;
-    m.active = $("#feact").checked; m.hidden = $("#fehid").checked;
+    m.active = $("#feact").checked; m.hidden = $("#fehid").checked; readFeatRes();
     if (f.customIdx !== undefined) { S.char.custom[f.customIdx].text = t; delete m.text; }
     closeModal(); save(); render();
   },
@@ -425,6 +545,9 @@ const ACT = {
 };
 // change-type actions (inputs/selects/checkboxes)
 const CHG = {
+  freeToggle: el => { const n = el.dataset.n, a = S.char.freeCasts ||= []; const i = a.indexOf(n); i >= 0 ? a.splice(i, 1) : a.push(n); },
+  spAtkSpell: el => { readSpAtk(); const old = S.modal.d; S.modal.d = el.value ? spellAttackPrefill(el.value, derive(S.char)) : { ...old, spell: "" }; },
+  spAtkMode: () => readSpAtk(),
   setFeat: el => { const t = target(); setPath(t, el.dataset.p, el.value ? { name: el.value, picks: {} } : null); },
   featMulti: el => { const t = target(); const p = el.dataset.p + ".picks." + el.dataset.k; const a = getPath(t, p) || []; const v = el.dataset.v; const i = a.indexOf(v); if (i >= 0) a.splice(i, 1); else if (a.length < +el.dataset.n) a.push(v); setPath(t, p, a); },
   pool: el => { const t = target(); const a = t.pools[el.dataset.k] ||= []; const v = el.dataset.v; const i = a.indexOf(v); i >= 0 ? a.splice(i, 1) : a.push(v); },

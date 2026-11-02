@@ -82,6 +82,8 @@ function lookup(name, slugs = []) {
   }
   return "";
 }
+// used when no rules text is loaded: tells cantrips from levelled spells for species magic
+const KNOWN_CANTRIPS = new Set(["acid splash", "blade ward", "booming blade", "chill touch", "control flames", "create bonfire", "dancing lights", "druidcraft", "eldritch blast", "elementalism", "fire bolt", "friends", "frostbite", "green flame blade", "guidance", "gust", "infestation", "light", "lightning lure", "mage hand", "magic stone", "mending", "message", "mind sliver", "minor illusion", "mold earth", "poison spray", "prestidigitation", "primal savagery", "produce flame", "ray of frost", "resistance", "sacred flame", "shape water", "shillelagh", "shocking grasp", "sorcerous burst", "spare the dying", "starry wisp", "sword burst", "thaumaturgy", "thorn whip", "thunderclap", "toll the dead", "true strike", "vicious mockery", "word of radiance"]);
 function spellInfo(name) { return S.idx.spell[norm(name)] || null; }
 function classSlug(cls) { return S.wiki.pages[cls + ":main"] ? cls + ":main" : findPage(cls, CLASSES[cls].name); }
 function subclassSlug(cls, sub) { const sc = CLASSES[cls].subclasses[sub]; if (!sc) return null;
@@ -377,7 +379,22 @@ function derive(c) {
   if (sp && c.species.id === "human") D.resources.push({ key: "heroic", name: "Heroic Inspiration (Resourceful)", max: 1, reset: "LR", feature: "Resourceful", src: "Human" });
   (c.custom || []).forEach((cf, i) => { if (+cf.uses > 0) D.resources.push({ key: "custom" + i, name: cf.name, max: +cf.uses, reset: cf.reset || "LR", feature: cf.name, src: "Custom" }); });
 
-  D.resources.forEach(r => { r.note = r.note || ""; r.die = r.die || ""; });
+  // spells you can cast once per long rest without a slot -> one resource each (shared with the Spells tab)
+  D.freeCast = {};
+  if (D.resources.some(r => r.key === "smite")) D.freeCast["divine smite"] = "smite";
+  if (D.resources.some(r => r.key === "favored")) D.freeCast["hunters mark"] = "favored";
+  const addFree = (spell, src, feature) => { const n = norm(spell); if (D.freeCast[n]) return; const key = "free_" + n.replace(/ /g, "_"); D.freeCast[n] = key;
+    D.resources.push({ key, name: spell + " (free cast)", max: 1, reset: "LR", feature: feature || spell, src, spell, note: "once without a slot" }); };
+  for (const lv in spSpells) if (D.level >= +lv) spSpells[lv].forEach(n => { const si = spellInfo(n); if ((si ? si.level : KNOWN_CANTRIPS.has(norm(n)) ? 0 : 1) > 0) addFree(n, sp.name, n); });
+  const FEAT_FREE = { "Fey Touched": "Misty Step", "Shadow Touched": "Invisibility", "Telepathic": "Detect Thoughts" };
+  D.feats.forEach(f => { if (FEAT_FREE[f.name]) addFree(FEAT_FREE[f.name], f.name, f.name); });
+  if (picked("invocations").includes("Gift of the Depths")) addFree("Water Breathing", "Gift of the Depths", "Gift of the Depths");
+  (c.freeCasts || []).forEach(n => addFree(n, "Added by you", n));
+  // resources you added to a feature yourself
+  for (const fk in c.featRes || {}) (c.featRes[fk] || []).forEach((r, i) => D.resources.push({ key: "fr_" + norm(fk).replace(/ /g, "_") + "_" + i, name: r.name || "Resource", max: +r.uses || 0, reset: r.reset || "LR", feature: r.feature || "", src: "Added by you", featKey: fk, idx: i, manual: true }));
+  // your own "uses" overrides
+  D.resources.forEach(r => { r.note = r.note || ""; r.die = r.die || ""; r.baseMax = r.max; const o = (c.resMax || {})[r.key]; if (o !== undefined && o !== null && o !== "") { r.max = +o; r.overridden = true; } });
+  D.allResources = D.resources; D.resources = D.resources.filter(r => r.max > 0);
 
   // attacks
   D.attacks = c.weapons.map(w => {
@@ -399,7 +416,25 @@ function derive(c) {
     const mastery = picked("mastery").some(m => m.startsWith(base.name + " (")) ? base.mastery : "";
     const exDice = (w.extra || "").match(/\d*d\d+(\s*[+-]\s*\d+)?/);
     const dmgFormula = ((dice === "1" && base.cat === "unarmed" && !D.cls.monk) ? String(Math.max(1, 1 + D.mod.str)) : `${dice}${dmod ? sgn(dmod) : ""}`) + (exDice ? "+" + exDice[0].replace(/\s+/g, "") : "");
-    return { dmgFormula, name: w.name || base.name, mastery, ab, abMod: D.mod[ab], baseProps: base.props, props: [base.props, mastery && "Mastery: " + mastery].filter(Boolean).join("; "), hit, dmg: dmg + (w.extra ? " + " + w.extra : ""), formula: `d20+${ABBR[ab]}${proficient ? "+Prof" : ""}${magic ? "+" + magic : ""}`, dformula: `${dice}+${ABBR[ab]}`, notes: w.notes || "" };
+    const dtype = dtKey(base.type), exType = dtFrom(w.extra) || dtype;
+    const parts = [{ f: (dice === "1" && base.cat === "unarmed" && !D.cls.monk) ? String(Math.max(1, 1 + D.mod.str)) : `${dice}${dmod ? sgn(dmod) : ""}`, type: dtype }];
+    if (exDice) parts.push({ f: exDice[0].replace(/\s+/g, ""), type: exType });
+    return { kind: "weapon", parts, dtype, ranged, heavy: props.includes("heavy"), dmgFormula, name: w.name || base.name, mastery, ab, abMod: D.mod[ab], baseProps: base.props, props: [base.props, mastery && "Mastery: " + mastery].filter(Boolean).join("; "), hit, dmg: dmg + (w.extra ? " + " + w.extra : ""), formula: `d20+${ABBR[ab]}${proficient ? "+Prof" : ""}${magic ? "+" + magic : ""}`, dformula: `${dice}+${ABBR[ab]}`, notes: w.notes || "" };
+  });
+
+  // spell attacks you added in the Attacks card
+  const cTier = 1 + (D.level >= 5) + (D.level >= 11) + (D.level >= 17);
+  D.spellAttacks = (c.spellAttacks || []).map(sa => {
+    const cs = D.casters.find(x => x.cls === sa.caster) || (sa.caster === "species" && D.speciesCast) || D.casters[0] || D.speciesCast || { atk: D.pb, dc: 8 + D.pb, ability: "int" };
+    const parts = (sa.parts || []).filter(p => p.f).map((p, i) => {
+      let f = p.f;
+      if (i === 0 && sa.cantrip && !/eldritch blast/i.test(sa.spell)) f = f.replace(/^(\d*)d(\d+)/, (m, n, s) => (+(n || 1) * cTier) + "d" + s);
+      if (i === 0 && sa.addMod) f += sgn(D.mod[cs.ability]);
+      return { f, type: dtKey(p.type) };
+    });
+    const beams = /eldritch blast/i.test(sa.spell) ? cTier : 0;
+    return { kind: "spell", name: sa.name || sa.spell, spell: sa.spell, mode: sa.mode, save: sa.save, hit: cs.atk + (+sa.hitBonus || 0), dc: cs.dc + (+sa.hitBonus || 0), ability: cs.ability, parts,
+      note: [beams > 1 ? beams + " beams — roll each beam separately" : "", sa.note || ""].filter(Boolean).join(" · ") };
   });
 
   D.features = collectFeatures(c, D);

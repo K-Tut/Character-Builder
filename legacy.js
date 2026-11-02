@@ -72,7 +72,7 @@ const LEGACY_SPECIES = {
     resources: [{ key: "hop", name: "Rabbit Hop", feature: "Rabbit Hop", reset: "LR", n: PB }] },
   hexblood: { name: "Hexblood", size: "Medium or Small", speed: 30, darkvision: 60, wiki: "hexblood", src: "Van Richten's Guide to Ravenloft",
     traits: { 1: ["Ancestral Legacy", "Darkvision", "Eerie Token", "Hex Magic"] }, spells: { 1: ["Disguise Self", "Hex"] }, spellAbility: true,
-    resources: [{ key: "token", name: "Eerie Token", feature: "Eerie Token", reset: "LR", n: ONE }, { key: "hexmagic", name: "Hex Magic (free casts)", feature: "Hex Magic", reset: "LR", n: () => 2 }] },
+    resources: [{ key: "token", name: "Eerie Token", feature: "Eerie Token", reset: "LR", n: ONE }] },
   hobgoblin: { name: "Hobgoblin", size: "Medium", speed: 30, darkvision: 60, wiki: "hobgoblin", src: "Monsters of the Multiverse",
     traits: { 1: ["Darkvision", "Fey Ancestry", "Fey Gift", "Fortune from the Many"] },
     resources: [{ key: "feygift", name: "Fey Gift (Help)", feature: "Fey Gift", reset: "LR", n: PB }, { key: "fortune", name: "Fortune from the Many", feature: "Fortune from the Many", reset: "LR", n: PB }] },
