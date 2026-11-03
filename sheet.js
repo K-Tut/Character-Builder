@@ -223,7 +223,7 @@ function mLevelUp() {
   const feats = C.features[cl] || [];
   // subclass
   if (feats.includes("@sub") && !d.subclasses[lv.cls]) {
-    const subCard = ([k, s]) => `<div class="pick ${S.ui.subPeek === k ? "peek" : ""}" data-act="luSub" data-k="${k}"><b>${s.name}</b><span class="small muted">${(s.features[cl] || []).join(", ")}</span>${s.legacy ? `<div class="small muted" style="font-style:italic;margin-top:2px">${esc(s.src)}</div>` : ""}
+    const subCard = ([k, s]) => `<div class="pick ${S.ui.subPeek === k ? "peek" : ""}" data-act="luSub" data-k="${k}"><b>${s.name}</b><span class="small muted">${(s.features[cl] || []).join(", ")}</span>${s.src ? `<div class="small muted" style="font-style:italic;margin-top:2px">${esc(s.src)}</div>` : ""}
       <a href="#" class="small subpeek" data-act="subPeek" data-k="${k}">${S.ui.subPeek === k ? "▾ hide features" : "▸ all features (levels 3–20)"}</a></div>`;
     const subs = Object.entries(C.subclasses), old = subs.filter(([, s]) => s.legacy);
     h += `<div class="lvl"><b>Choose your subclass:</b><div class="grid gauto" style="margin-top:6px">${subs.filter(([, s]) => !s.legacy).map(subCard).join("")}</div>
@@ -537,21 +537,6 @@ const ACT = {
     try { toast("Unlocking…"); await WikiLock.unlock(pw, $("#wikiPwRem").checked); render(); toast("Rules text unlocked"); }
     catch (e) { toast(e.message === "Wrong password" ? "Wrong password" : "Could not unlock: " + e.message); }
   },
-  sharedUnlock: async el => {
-    const i = +el.dataset.i, f = Shared.folders[i], pw = $("#sharedPw" + i)?.value; if (!f) return; if (!pw) return toast("Enter the password");
-    try { toast("Opening…"); await Shared.unlock(f, pw, $("#sharedPwRem" + i)?.checked); render(); toast("Folder opened"); }
-    catch (e) { toast(e.message === "Wrong password" ? "Wrong password" : "Could not open: " + e.message); }
-  },
-  sharedLock: el => { const f = Shared.folders[+el.dataset.i]; if (f) Shared.lock(f); render(); },
-  sharedAdd: async el => {
-    const f = Shared.folders[+el.dataset.i]; const c = f?.chars.find(x => x.id === el.dataset.id); if (!c) return;
-    if (await Shared.add(c)) { await loadChars(); render(); toast(c.name + " added to your characters"); }
-  },
-  sharedAddAll: async el => {
-    const f = Shared.folders[+el.dataset.i]; if (!f) return; let n = 0;
-    for (const c of f.chars) if (await Shared.add(c, false)) n++;
-    await loadChars(); render(); toast(`Added ${n} character${n === 1 ? "" : "s"}`);
-  },
   wikiEncExport: async () => {
     const pw = prompt("Choose a password for the rules text (share it only with your group):"); if (!pw) return;
     if (prompt("Type the password again:") !== pw) return toast("Passwords did not match");
@@ -611,10 +596,6 @@ document.addEventListener("click", e => {
   if (el.tagName === "A") e.preventDefault();
   fn(el, e);
 });
-document.addEventListener("keydown", e => {
-  const el = e.target; if (e.key !== "Enter" || !el.dataset?.enter) return;
-  const fn = ACT[el.dataset.enter]; if (fn) { e.preventDefault(); fn(el, e); }
-});
 document.addEventListener("change", e => {
   const el = e.target;
   if (el.dataset.path) {
@@ -647,7 +628,6 @@ $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && 
     await Folder.pull();
   }
   await WikiLock.check();
-  await Shared.check();
   await loadChars();
   Sync.loadToken();
   render(); renderSyncChip();

@@ -80,7 +80,7 @@ function lookup(name, slugs = []) {
     const arr = S.idx.sec[k]; if (!arr) continue;
     const h = arr.find(a => a.cat !== "spell" && !isLegacyPage(a.slug)) || arr.find(a => a.cat !== "spell") || arr[0]; if (h) return stripSource(h.text);
   }
-  return "";
+  return (typeof SUB_DESC !== "undefined" && SUB_DESC[name]) || "";
 }
 // used when no rules text is loaded: tells cantrips from levelled spells for species magic
 const KNOWN_CANTRIPS = new Set(["acid splash", "blade ward", "booming blade", "chill touch", "control flames", "create bonfire", "dancing lights", "druidcraft", "eldritch blast", "elementalism", "fire bolt", "friends", "frostbite", "green flame blade", "guidance", "gust", "infestation", "light", "lightning lure", "mage hand", "magic stone", "mending", "message", "mind sliver", "minor illusion", "mold earth", "poison spray", "prestidigitation", "primal savagery", "produce flame", "ray of frost", "resistance", "sacred flame", "shape water", "shillelagh", "shocking grasp", "sorcerous burst", "spare the dying", "starry wisp", "sword burst", "thaumaturgy", "thorn whip", "thunderclap", "toll the dead", "true strike", "vicious mockery", "word of radiance"]);
@@ -236,7 +236,7 @@ function derive(c) {
   if (bg) { bg.skills.forEach(s => prof.add(s)); if (bg.tool) tools.add(bg.tool); }
   (sp?.skills || []).forEach(s => prof.add(s));
   for (const k in D.subs) (D.subs[k].skills || []).forEach(s => prof.add(s));
-  for (const k in D.pools) if (k.startsWith("skills:") || k === "skillsLore" || k === "keenSenses" || k === "skillful" || k === "primalKnowledge" || k === "spSkills") picked(k).slice(0, D.pools[k].max).forEach(s => prof.add(s));
+  for (const k in D.pools) if (k.startsWith("skills:") || k === "skillsLore" || k === "keenSenses" || k === "skillful" || k === "primalKnowledge" || k === "spSkills" || POOLS[k]?.skill) picked(k).slice(0, D.pools[k].max).forEach(s => prof.add(s));
   D.feats.forEach(f => {
     if (f.name === "Skilled") (f.picks?.skills || []).forEach(s => SKILLS[s] ? prof.add(s) : tools.add(s));
     if (f.name === "Skill Expert" && f.picks?.skill) prof.add(f.picks.skill);
@@ -358,8 +358,10 @@ function derive(c) {
   // always-prepared spells
   D.alwaysSpells = [];
   for (const k in D.subs) {
-    const sub = D.subs[k]; if (!sub.spells) continue;
-    for (const lv in sub.spells) if (D.cls[k] >= +lv) sub.spells[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: k, src: sub.name }));
+    const sub = D.subs[k];
+    for (const lv in sub.spells || {}) if (D.cls[k] >= +lv) sub.spells[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: k, src: sub.name }));
+    const cs = sub.choiceSpells, pick = cs && (c.pools[cs.pool] || [])[0], bySp = pick && cs.by[pick];
+    if (bySp) for (const lv in bySp) if (D.cls[k] >= +lv) bySp[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: k, src: sub.name + " (" + pick + ")" }));
   }
   const spSpells = { ...(sp?.spells || {}) }; for (const lv in spc.spells || {}) spSpells[lv] = [...(spSpells[lv] || []), ...spc.spells[lv]];
   for (const lv in spSpells) if (D.level >= +lv || (D.level === 0 && +lv === 1)) spSpells[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: "species", src: sp.name + (c.species.choice ? " (" + c.species.choice + ")" : "") }));
