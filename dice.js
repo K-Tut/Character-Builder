@@ -142,7 +142,7 @@ const Dice = {
       save(); render();
     }
     const tag = { adv: "Advantage", dis: "Disadvantage", crit: "Critical" }[mode] || "";
-    this.next = c.then || null;
+    this.next = c.then || null; this.done = c.onDone || null;
     this.cur = null; this.renderAsk();
     if (c.kind === "dmg") flat = Object.values(tflat).reduce((a, b) => a + b, 0);
     this.roll(c.title + (tag ? ` (${tag})` : ""), dice, flat, c.kind === "d20", c.kind === "dmg" ? tflat : null);
@@ -213,6 +213,7 @@ const Dice = {
         clearInterval(tick);
         ["dicetotal", "dicebd", "dicefoot", "dicesplit", "diceboostnote"].forEach(k => el.querySelector("." + k)?.classList.remove("hidden"));
         if (crit || fumble) el.querySelector(".dicenat").classList.remove("hidden");
+        if (this.done) { const fn = this.done; this.done = null; const nr = res.find(r => r.d20 && !r.dropped); fn({ total, nat: nr ? nr.v : null }); }
         el.querySelector(".dicetotal").classList.toggle("crit", !!crit); el.querySelector(".dicetotal").classList.toggle("fumble", !!fumble);
         try { navigator.vibrate && navigator.vibrate(crit ? [40, 60, 40] : 25); } catch (e) { }
         if (this.tray.open) this.renderTray();

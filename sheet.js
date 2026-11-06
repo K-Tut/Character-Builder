@@ -43,6 +43,18 @@ function resKind(r, feats) {
 }
 const ICON_HEART = `<svg viewBox="0 0 24 24"><path d="M12 21s-7.6-4.6-9.8-9.4C.6 8 2.6 3.8 6.6 3.8c2.3 0 4 1.3 5.4 3.2 1.4-1.9 3.1-3.2 5.4-3.2 4 0 6 4.2 4.4 7.8C19.6 16.4 12 21 12 21z"/></svg>`;
 const ICON_SKULL = `<svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.2c-5 0-8.8 3.6-8.8 8.4 0 2.8 1.3 4.9 3.3 6.2v2.4c0 1 .8 1.8 1.8 1.8h7.4c1 0 1.8-.8 1.8-1.8v-2.4c2-1.3 3.3-3.4 3.3-6.2 0-4.8-3.8-8.4-8.8-8.4zM8.4 9.4a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zm7.2 0a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM12 14.2l1.3 2.4h-2.6zM9.6 18.4h1v2h-1zm3.8 0h1v2h-1z"/></svg>`;
+// result of a rolled death save -> hearts / skulls (2024 rules)
+function applyDeathSave(r) {
+  const c = S.char; if (!c) return;
+  const P = c.play, D = derive(c); if ((P.hp ?? D.hpMax) > 0 || P.ds.f >= 3) return;
+  let msg;
+  if (r.nat === 20) { P.hp = 1; P.ds = { s: 0, f: 0 }; msg = "Natural 20! You regain 1 HP and wake up."; }
+  else if (r.nat === 1) { P.ds.f = Math.min(3, P.ds.f + 2); msg = "Natural 1 — two failures."; }
+  else if (r.total >= 10) { P.ds.s = Math.min(3, P.ds.s + 1); msg = P.ds.s >= 3 ? "Third success — you're stable." : "Success."; }
+  else { P.ds.f = Math.min(3, P.ds.f + 1); msg = "Failure."; }
+  if (P.ds.f >= 3) msg += " Three failures — your character dies.";
+  save(); render(); toast(msg);
+}
 function isBloodied(c, D) { const hp = c.play?.hp ?? D.hpMax; return hp > 0 && hp <= Math.floor(D.hpMax / 2); }
 // reasons the character has Advantage on attack rolls right now
 function advantageHints(c, D) {
@@ -139,7 +151,7 @@ function renderSheet() {
     <div class="hpbar"><div style="width:${pct}%;background:${pct < 30 ? "#b33" : pct < 60 ? "var(--warn)" : "var(--good)"}"></div></div>
     <div class="row"><input id="hpAmt" type="number" min="0" placeholder="amount" style="width:90px"><button class="danger" data-act="hp" data-m="dmg">Damage</button><button style="background:var(--good)" data-act="hp" data-m="heal">Heal</button><button class="ghost" data-act="hp" data-m="temp">Set temp</button></div>
     <div class="row small" style="margin-top:10px"><b>Hit Dice:</b>${D.hitDice.map(x => `<span>${x.die}: ${pips("hd_" + x.die, x.n, P.hd[x.die])}</span>`).join("")}</div>
-    ${hp <= 0 ? `<div class="dsaves"><div class="row"><b>Death saves</b><button class="small right" ${R("Death saving throw", 0)}>🎲 Roll</button></div>
+    ${hp <= 0 ? `<div class="dsaves"><div class="row"><b>Death saves</b><button class="small right" data-act="dsRoll">🎲 Roll</button></div>
       <div class="dsrow"><span class="dslbl">Successes</span>${[0, 1, 2].map(i => `<button class="dspip ok ${P.ds.s > i ? "on" : ""}" data-act="dsTap" data-k="s" data-i="${i}" title="Success ${i + 1}">${ICON_HEART}</button>`).join("")}${P.ds.s >= 3 ? '<span class="chip">stable</span>' : ""}</div>
       <div class="dsrow"><span class="dslbl">Failures</span>${[0, 1, 2].map(i => `<button class="dspip bad ${P.ds.f > i ? "on" : ""}" data-act="dsTap" data-k="f" data-i="${i}" title="Failure ${i + 1}">${ICON_SKULL}</button>`).join("")}${P.ds.f >= 3 ? '<span class="chip">dead</span>' : ""}</div></div>` : ""}
   </div>
@@ -433,6 +445,7 @@ const ACT = {
   theme: () => { const r = document.documentElement; const d = r.dataset.theme === "dark" ? "light" : "dark"; r.dataset.theme = d; try { localStorage.setItem("theme", d); } catch (e) { } },
   new: async () => { S.char = newChar(); await save(true); S.view = "builder"; S.tab = "basics"; render(); },
   open: el => openChar(el.dataset.id),
+  dsRoll: () => Dice.ask({ kind: "d20", title: "Death saving throw", mod: 0, onDone: applyDeathSave }),
   dsTap: el => { const P = S.char.play, k = el.dataset.k, i = +el.dataset.i; P.ds[k] = P.ds[k] > i ? i : i + 1; save(); render(); },
   spFilter: el => { S.ui.spf = el.dataset.f; render(); },
   groupToggle: (el, e) => { if (e.target.closest("[data-act=groupEdit]")) return; const g = el.dataset.g, o = openGroups(); const i = o.indexOf(g); i >= 0 ? o.splice(i, 1) : o.push(g); try { localStorage.setItem("openGroups", JSON.stringify(o)); } catch (x) { } render(); },
