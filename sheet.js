@@ -437,7 +437,6 @@ const ACT = {
   spFilter: el => { S.ui.spf = el.dataset.f; render(); },
   groupToggle: (el, e) => { if (e.target.closest("[data-act=groupEdit]")) return; const g = el.dataset.g, o = openGroups(); const i = o.indexOf(g); i >= 0 ? o.splice(i, 1) : o.push(g); try { localStorage.setItem("openGroups", JSON.stringify(o)); } catch (x) { } render(); },
   groupEdit: (el, e) => { e?.stopPropagation(); const g = el.dataset.g || ""; openModal({ type: "group", orig: g, name: g, ids: S.chars.filter(c => g && c.group === g).map(c => c.id) }); },
-  grpToggle: el => { const m = S.modal, id = el.dataset.id; m.name = $("#grpname").value; m.ids = el.checked ? [...new Set([...m.ids, id])] : m.ids.filter(x => x !== id); renderModal(); },
   grpSave: async () => {
     const m = S.modal, name = $("#grpname").value.trim();
     if (!name) return toast("Give the group a name");
@@ -649,6 +648,7 @@ const ACT = {
 };
 // change-type actions (inputs/selects/checkboxes)
 const CHG = {
+  grpToggle: el => { const m = S.modal, id = el.dataset.id; m.name = $("#grpname").value; m.ids = el.checked ? [...new Set([...m.ids, id])] : m.ids.filter(x => x !== id); },
   restChoice: el => { S.char.pools[el.dataset.k] = el.value ? [el.value] : []; },
   freeToggle: el => { const n = el.dataset.n, a = S.char.freeCasts ||= []; const i = a.indexOf(n); i >= 0 ? a.splice(i, 1) : a.push(n); },
   spAtkSpell: el => { readSpAtk(); const old = S.modal.d; S.modal.d = el.value ? spellAttackPrefill(el.value, derive(S.char)) : { ...old, spell: "" }; },
