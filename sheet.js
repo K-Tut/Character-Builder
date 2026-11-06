@@ -192,7 +192,7 @@ function renderModalInner() {
   if (!S.modal) { bg.classList.add("hidden"); return; }
   bg.classList.remove("hidden");
   const st = box.scrollTop;
-  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin }[S.modal.type]();
+  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, longRest: mLongRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin }[S.modal.type]();
   box.scrollTop = st;
 }
 
@@ -239,7 +239,7 @@ function mLevelUp() {
   feats.forEach(n => { if (n === "@sub") { const s = D.subs[lv.cls]; if (s) (s.features[cl] || []).forEach(x => newF.push([x, s.name])); } else if (n !== "@asi" && n !== "@boon") newF.push([n, C.name]); });
   if (i > 0 || true) {
     const slug = classSlug(lv.cls), ss = d.subclasses[lv.cls] ? subclassSlug(lv.cls, d.subclasses[lv.cls]) : null;
-    h += newF.map(([n, src]) => `<details class="lvl"><summary><b>${esc(n)}</b> <span class="muted small">${esc(src)}</span>${C.notes?.[n] ? ` <span class="chip">${esc(C.notes[n](cl, D))}</span>` : ""}</summary><div class="desc">${para(lookup(n, [ss, slug].filter(Boolean))) || '<span class="muted">No description imported.</span>'}</div></details>`).join("");
+    h += newF.map(([n, src]) => `<details class="lvl"><summary><b>${esc(n)}</b> <span class="muted small">${esc(src)}</span>${C.notes?.[n] ? ` <span class="chip">${esc(C.notes[n](cl, D))}</span>` : ""}</summary><div class="desc">${para(lookup(n, [ss, slug].filter(Boolean), D.subs[lv.cls] && src === D.subs[lv.cls].name ? subDesc(lv.cls, d.subclasses[lv.cls], n) : "")) || '<span class="muted">No description imported.</span>'}</div></details>`).join("");
   }
   // HP
   if (i > 0) {
@@ -344,7 +344,22 @@ function mShortRest() {
    ${D.hitDice.map(x => { const rem = x.n - (c.play.hd[x.die] || 0); return `<div class="res"><span class="n"><b>${x.die}</b> — ${rem} of ${x.n} left</span><button class="small" data-act="hdRoll" data-d="${x.die}" ${rem <= 0 ? "disabled" : ""}>🎲 Spend 1 ${x.die}</button></div>`; }).join("")}
    <p>HP: <b>${Math.min(c.play.hp ?? D.hpMax, D.hpMax)}</b> / ${D.hpMax}</p>${S.modal.log ? `<p class="small muted">${S.modal.log}</p>` : ""}
    <p class="small muted">Finishing restores: ${D.resources.filter(r => r.reset === "SR" || r.note.startsWith("regain 1")).map(r => r.name).join(", ") || "—"}${D.pact ? ", Pact slots" : ""}.</p>
+   ${restChoiceUI(D, "SR")}
    <div class="foot"><button class="ghost" data-act="modalClose">Cancel</button><button data-act="srFinish">Finish short rest</button></div>`;
+}
+// subclass choices you make on a rest (Ebon Blade rune, Land type, Dread Allegiance, Mystic Brew...)
+function restChoiceList(D, rest) { return (D.restChoices || []).filter(r => r.ch.reset === "SR" || (rest === "LR" && r.ch.reset === "LR")); }
+function restChoiceUI(D, rest) {
+  const list = restChoiceList(D, rest); if (!list.length) return "";
+  return `<div class="card" style="margin:10px 0"><h3 style="margin-top:0">${rest === "LR" ? "Choices for the next day" : "Choices on this rest"}</h3>` + list.map(r => `
+    <label style="display:block;margin:6px 0"><b>${esc(r.ch.label)}</b> <span class="small muted">(${esc(r.sub.name)})</span><br>
+      <select data-act="restChoice" data-k="${r.ch.key}">${r.pick ? "" : '<option value="">— choose —</option>'}${r.ch.options.map(o => `<option ${o === r.pick ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label>
+    ${r.pick ? `<div class="small desc" style="margin:2px 0 8px">${para(choiceText(r.ch, r.pick))}</div>` : ""}`).join("") + `</div>`;
+}
+function mLongRest() {
+  const D = derive(S.char);
+  return `<h2>Long rest</h2><p>Restores HP, Hit Dice, spell slots and all uses.</p>${restChoiceUI(D, "LR")}
+   <div class="foot"><button class="ghost" data-act="modalClose">Cancel</button><button data-act="lrFinish">Finish long rest</button></div>`;
 }
 
 function applyFeatPick(p, v) {
@@ -457,10 +472,16 @@ const ACT = {
   insp: () => { S.char.play.inspiration = !S.char.play.inspiration; save(); render(); },
   showHidden: () => { S.ui.showHidden = !S.ui.showHidden; render(); },
   longRest: () => {
+    if (restChoiceList(derive(S.char), "LR").length) return openModal({ type: "longRest" });
     if (!confirm("Take a long rest? Restores HP, hit dice, spell slots and all uses.")) return;
+    ACT.lrFinish();
+  },
+  lrFinish: () => {
+    if (S.modal) closeModal();
     const P = S.char.play, D = derive(S.char);
     Object.assign(P, { hp: D.hpMax, temp: 0, used: {}, slots: {}, pact: 0, hd: {}, ds: { s: 0, f: 0 }, active: {}, exhaustion: Math.max(0, (+P.exhaustion || 0) - 1) });
     P.conditions = P.conditions.filter(x => x !== "Raging" && x !== "Concentrating");
+    const tmp = Math.max(0, ...(D.restChoices || []).map(r => r.pick && r.ch.lrTemp?.[r.pick] ? r.ch.lrTemp[r.pick](D.cls[r.cls], D) : 0)); if (tmp) P.temp = tmp;
     const pr = rollPortent(D);
     save(); render(); toast("Long rest complete" + (pr ? " · Portent: " + pr : ""));
   },
@@ -559,6 +580,7 @@ const ACT = {
 };
 // change-type actions (inputs/selects/checkboxes)
 const CHG = {
+  restChoice: el => { S.char.pools[el.dataset.k] = el.value ? [el.value] : []; },
   freeToggle: el => { const n = el.dataset.n, a = S.char.freeCasts ||= []; const i = a.indexOf(n); i >= 0 ? a.splice(i, 1) : a.push(n); },
   spAtkSpell: el => { readSpAtk(); const old = S.modal.d; S.modal.d = el.value ? spellAttackPrefill(el.value, derive(S.char)) : { ...old, spell: "" }; },
   spAtkMode: () => readSpAtk(),

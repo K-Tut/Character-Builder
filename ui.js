@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-03a";
+const APP_VERSION = "2026-11-06a";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -322,9 +322,11 @@ function subOverview(cls, key, curLvl) {
   h += lvls.map(l => {
     const fs = s.features[l] || [], sp = (s.spells || {})[l] || [];
     return `<div class="subovl ${curLvl && l <= curLvl ? "have" : ""}"><div class="subovh">Level ${l}${curLvl && l <= curLvl ? ' <span class="small muted">✓ you have this</span>' : ""}</div>
-      ${fs.map(n => `<details><summary><b>${esc(n)}</b>${s.notes?.[n] ? "" : ""}</summary><div class="desc">${para(lookup(n, [slug, cslug].filter(Boolean))) || '<span class="muted small">No description imported.</span>'}</div></details>`).join("")}
+      ${fs.map(n => `<details><summary><b>${esc(n)}</b>${s.notes?.[n] ? "" : ""}</summary><div class="desc">${para(lookup(n, [slug, cslug].filter(Boolean), subDesc(cls, key, n))) || '<span class="muted small">No description imported.</span>'}</div></details>`).join("")}
       ${sp.length ? `<div class="small" style="margin:4px 0 2px"><b>Always prepared spells:</b> ${sp.map(n => esc(n)).join(", ")}</div>` : ""}</div>`;
   }).join("");
+  (s.choices || []).forEach(ch => { h += `<div class="subovl"><div class="subovh">${esc(ch.label)} <span class="small muted">${ch.reset === "LR" ? "(change after each Long Rest)" : ch.reset === "SR" ? "(pick on each rest)" : "(choose once)"}</span></div>
+    ${ch.options.map(o => `<details><summary><b>${esc(o)}</b></summary><div class="desc">${para(choiceText(ch, o))}</div></details>`).join("")}</div>`; });
   if ((s.resources || []).length) h += `<p class="small muted" style="margin:6px 0 0">Tracked uses on the play sheet: ${s.resources.map(r => esc(r.name)).join(", ")}</p>`;
   return h + `</div>`;
 }

@@ -70,17 +70,18 @@ function findPage(cat, name, exclude, fuzzy) {
   return hit ? hit.slug : null;
 }
 function pageText(slug) { const p = S.wiki.pages[slug]; return p ? stripSource(p.text.replace(/^##\s*/gm, "")) : ""; }
-function lookup(name, slugs = []) {
+function lookup(name, slugs = [], fb = "") {
   const keys = headingKeys(name);
   for (const k of keys) {
     const arr = S.idx.sec[k]; if (!arr) continue;
     for (const s of slugs) { const h = arr.find(a => a.slug === s); if (h) return stripSource(h.text); }
   }
+  if (fb) return fb;
   for (const k of keys) {
     const arr = S.idx.sec[k]; if (!arr) continue;
     const h = arr.find(a => a.cat !== "spell" && !isLegacyPage(a.slug)) || arr.find(a => a.cat !== "spell") || arr[0]; if (h) return stripSource(h.text);
   }
-  return (typeof SUB_DESC !== "undefined" && SUB_DESC[name]) || "";
+  return "";
 }
 // used when no rules text is loaded: tells cantrips from levelled spells for species magic
 const KNOWN_CANTRIPS = new Set(["acid splash", "blade ward", "booming blade", "chill touch", "control flames", "create bonfire", "dancing lights", "druidcraft", "eldritch blast", "elementalism", "fire bolt", "friends", "frostbite", "green flame blade", "guidance", "gust", "infestation", "light", "lightning lure", "mage hand", "magic stone", "mending", "message", "mind sliver", "minor illusion", "mold earth", "poison spray", "prestidigitation", "primal savagery", "produce flame", "ray of frost", "resistance", "sacred flame", "shape water", "shillelagh", "shocking grasp", "sorcerous burst", "spare the dying", "starry wisp", "sword burst", "thaumaturgy", "thorn whip", "thunderclap", "toll the dead", "true strike", "vicious mockery", "word of radiance"]);
@@ -89,6 +90,7 @@ function classSlug(cls) { return S.wiki.pages[cls + ":main"] ? cls + ":main" : f
 function subclassSlug(cls, sub) { const sc = CLASSES[cls].subclasses[sub]; if (!sc) return null;
   if (sc.legacy) return S.wiki.pages[sc.slug] ? sc.slug : null;
   return findPage(cls, sc.name, p => p.slug.endsWith(":main") || isLegacyPage(p), true); }
+function subChoice(c, ch) { const v = (c.pools?.[ch.key] || [])[0]; return ch.options.includes(v) ? v : ""; }
 function speciesSlug(sp) { if (!sp) return null; if (sp.legacy) return S.wiki.pages[sp.slug] ? sp.slug : null; return findPage("species", sp.name, isLegacyPage); }
 
 // ---------- feat catalog: built-in feats + every feat page from the wiki ----------
@@ -332,6 +334,18 @@ function derive(c) {
   D.size = c.species.size || (sp ? sp.size.split(" or ")[0] : "Medium");
   D.resist = [...(sp?.resist || []), ...(spc.resist || [])];
   if (sp?.resistFromChoice && c.species.choice) { const m = c.species.choice.match(/\((.*)\)/); if (m) D.resist.push(m[1]); }
+  // subclass resistances, rest-choices (rune, land, allegiance...) and what can be changed on a rest
+  D.restChoices = [];
+  for (const k in D.subs) {
+    const sub = D.subs[k], l = D.cls[k]; D.resist.push(...(sub.resist || []));
+    for (const ch of sub.choices || []) {
+      if (l < (ch.from || 3)) continue;
+      const pick = subChoice(c, ch);
+      if (pick && ch.resist?.[pick] && l >= (ch.resistFrom || 0)) D.resist.push(...ch.resist[pick]);
+      D.restChoices.push({ cls: k, sub, ch, pick });
+    }
+  }
+  D.resist = [...new Set(D.resist)];
 
   // spellcasting
   D.casters = []; let casterLevel = 0, nCasters = 0;
@@ -360,8 +374,11 @@ function derive(c) {
   for (const k in D.subs) {
     const sub = D.subs[k];
     for (const lv in sub.spells || {}) if (D.cls[k] >= +lv) sub.spells[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: k, src: sub.name }));
-    const cs = sub.choiceSpells, pick = cs && (c.pools[cs.pool] || [])[0], bySp = pick && cs.by[pick];
-    if (bySp) for (const lv in bySp) if (D.cls[k] >= +lv) bySp[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: k, src: sub.name + " (" + pick + ")" }));
+    for (const ch of sub.choices || []) {
+      const pick = subChoice(c, ch), bySp = pick && ch.spells?.[pick];
+      if (bySp && D.cls[k] >= (ch.from || 3)) for (const lv in bySp) if (D.cls[k] >= +lv) bySp[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: k, src: sub.name + " (" + pick + ")" }));
+    }
+    for (const lv in sub.freeCasts || {}) if (D.cls[k] >= +lv) sub.freeCasts[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: k, src: sub.name }));
   }
   const spSpells = { ...(sp?.spells || {}) }; for (const lv in spc.spells || {}) spSpells[lv] = [...(spSpells[lv] || []), ...spc.spells[lv]];
   for (const lv in spSpells) if (D.level >= +lv || (D.level === 0 && +lv === 1)) spSpells[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: "species", src: sp.name + (c.species.choice ? " (" + c.species.choice + ")" : "") }));
@@ -379,6 +396,8 @@ function derive(c) {
   (sp?.resources || []).forEach(r => pushRes(r, D.level, sp.name));
   D.feats.forEach(f => { const fd = FEATS[f.name]; if (fd?.res) pushRes({ key: "feat_" + norm(f.name), feature: f.name, ...fd.res }, D.level, f.name); });
   if (sp && c.species.id === "human") D.resources.push({ key: "heroic", name: "Heroic Inspiration (Resourceful)", max: 1, reset: "LR", feature: "Resourceful", src: "Human" });
+  const replaced = new Set(Object.entries(D.subs).filter(([k]) => D.cls[k] >= 3).flatMap(([, s]) => s.replaces || []));
+  if (replaced.size) D.resources = D.resources.filter(r => !replaced.has(r.feature));
   (c.custom || []).forEach((cf, i) => { if (+cf.uses > 0) D.resources.push({ key: "custom" + i, name: cf.name, max: +cf.uses, reset: cf.reset || "LR", feature: cf.name, src: "Custom" }); });
 
   // spells you can cast once per long rest without a slot -> one resource each (shared with the Spells tab)
@@ -391,6 +410,7 @@ function derive(c) {
   const FEAT_FREE = { "Fey Touched": "Misty Step", "Shadow Touched": "Invisibility", "Telepathic": "Detect Thoughts" };
   D.feats.forEach(f => { if (FEAT_FREE[f.name]) addFree(FEAT_FREE[f.name], f.name, f.name); });
   if (picked("invocations").includes("Gift of the Depths")) addFree("Water Breathing", "Gift of the Depths", "Gift of the Depths");
+  for (const k in D.subs) for (const lv in D.subs[k].freeCasts || {}) if (D.cls[k] >= +lv) D.subs[k].freeCasts[lv].forEach(n => addFree(n, D.subs[k].name, n));
   (c.freeCasts || []).forEach(n => addFree(n, "Added by you", n));
   // resources you added to a feature yourself
   for (const fk in c.featRes || {}) (c.featRes[fk] || []).forEach((r, i) => D.resources.push({ key: "fr_" + norm(fk).replace(/ /g, "_") + "_" + i, name: r.name || "Resource", max: +r.uses || 0, reset: r.reset || "LR", feature: r.feature || "", src: "Added by you", featKey: fk, idx: i, manual: true }));
@@ -503,13 +523,18 @@ function collectFeatures(c, D) {
     for (let lv = 1; lv <= l; lv++) {
       for (const name of C.features[lv] || []) {
         if (name === "@asi" || name === "@boon" || name === "@sub") continue;
+        if (sub?.replaces?.includes(name) && l >= 3) continue;
         let note = C.notes?.[name] ? C.notes[name](l, D) : "";
         if (name === "Weapon Mastery" && D.pools.mastery) note = (c.pools.mastery || []).slice(0, D.pools.mastery.max).join(", ");
         add(k + ":" + name, name, C.name + " " + lv, lookup(name, [slug].filter(Boolean)), { note, cat: "class" });
       }
       if (sub) for (const name of sub.features[lv] || []) {
         const note = sub.notes?.[name] ? sub.notes[name](l, D) : "";
-        add(k + ":" + c.subclasses[k] + ":" + name, name, sub.name + " " + lv, lookup(name, [sslug, slug].filter(Boolean)), { note, cat: "subclass" });
+        add(k + ":" + c.subclasses[k] + ":" + name, name, sub.name + " " + lv, lookup(name, [sslug, slug].filter(Boolean), subDesc(k, c.subclasses[k], name)), { note, cat: "subclass" });
+      }
+      if (sub) for (const ch of sub.choices || []) if ((ch.from || 3) === lv) {
+        const pick = subChoice(c, ch);
+        add(k + ":" + c.subclasses[k] + ":choice:" + ch.key, ch.label + ": " + (pick || "— not chosen —"), sub.name + " " + lv, pick ? choiceText(ch, pick) : "Pick one in the Long Rest window (🌙) or when you level up.", { note: ch.reset === "LR" ? "change on Long Rest" : ch.reset === "SR" ? "pick on each rest" : "", cat: "subclass" });
       }
     }
   }
