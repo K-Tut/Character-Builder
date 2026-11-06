@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-06a";
+const APP_VERSION = "2026-11-06b";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -110,17 +110,31 @@ function renderInner() {
 }
 
 // ---------- HOME ----------
+const charCard = c => `<div class="card charcard" data-act="open" data-id="${esc(c.id)}">
+      ${c.thumb ? `<img src="${c.thumb}">` : `<div class="ph">🛡</div>`}
+      <div class="grow"><b>${esc(c.name)}</b><div class="muted small">${esc(c.summary || "")}</div></div>
+    </div>`;
+function openGroups() { try { return JSON.parse(localStorage.getItem("openGroups") || "[]"); } catch (e) { return []; } }
+// characters grouped by their "group" name (stored on each character, so it syncs and exports with it)
+function renderCharGroups() {
+  if (!S.chars.length) return `<p class="muted">No characters yet — create one!</p>`;
+  const groups = {}; S.chars.forEach(c => { if (c.group) (groups[c.group] ||= []).push(c); });
+  const names = Object.keys(groups).sort((a, b) => a.localeCompare(b)), open = openGroups();
+  const loose = S.chars.filter(c => !c.group);
+  return `${names.map(n => { const m = groups[n], on = open.includes(n); return `<div class="card cgroup ${on ? "on" : ""}">
+      <div class="cghead" data-act="groupToggle" data-g="${esc(n)}"><span class="cgarrow">${on ? "▾" : "▸"}</span><div class="grow"><b class="cgname">${esc(n)}</b><div class="muted small">${m.length} character${m.length === 1 ? "" : "s"}</div></div>
+        <div class="cgfaces">${m.map(c => c.thumb ? `<img src="${c.thumb}" title="${esc(c.name)}">` : `<span class="ph" title="${esc(c.name)}">${esc((c.name || "?").slice(0, 1))}</span>`).join("")}</div>
+        <button class="ghost small" data-act="groupEdit" data-g="${esc(n)}" title="Rename or change members">✎</button></div>
+      ${on ? `<div class="chars" style="margin-top:12px">${m.map(charCard).join("")}</div>` : ""}</div>`; }).join("")}
+    <div class="chars">${loose.map(charCard).join("")}</div>`;
+}
 function renderHome() {
   const W = S.wiki; const np = Object.keys(W.pages || {}).length, ns = Object.keys(W.spells || {}).length;
   const imp = S.ui.import || {}; const st = S.settings || {};
   const syncOn = Sync.enabled();
   return `
-  <div class="card"><div class="row"><h2 style="margin:0">Your characters</h2><button class="right" data-act="new">+ New</button><button class="ghost" data-act="importJson">⤒ Import</button><button class="ghost" data-act="exportAll" title="Save all characters in one file (Import reads it back)">⤓ Export all</button></div></div>
-  <div class="chars">${S.chars.map(c => `
-    <div class="card charcard" data-act="open" data-id="${esc(c.id)}">
-      ${c.thumb ? `<img src="${c.thumb}">` : `<div class="ph">🛡</div>`}
-      <div class="grow"><b>${esc(c.name)}</b><div class="muted small">${esc(c.summary || "")}</div></div>
-    </div>`).join("") || `<p class="muted">No characters yet — create one!</p>`}</div>
+  <div class="card"><div class="row"><h2 style="margin:0">Your characters</h2><button class="right" data-act="new">+ New</button><button class="ghost" data-act="importJson">⤒ Import</button><button class="ghost" data-act="exportAll" title="Save all characters in one file (Import reads it back)">⤓ Export all</button><button class="ghost" data-act="groupEdit" data-g="" title="Put characters together in a named group">🗂 New group</button></div></div>
+  ${renderCharGroups()}
   <p class="small muted" style="margin:4px 2px 14px">${S.server ? "Characters are also saved as files in the <b>characters</b> folder on this PC." : "Characters are saved in this app on this device."} To move one to another device: open it → <b>⤓ Export</b>, send the file, then <b>Import</b> it there.</p>
 
   <div class="card" style="margin-top:20px">

@@ -114,7 +114,9 @@ const Dice = {
         <select id="dxs">${[4, 6, 8, 10, 12, 20].map(s => `<option value="${s}">d${s}</option>`).join("")}</select>${d20 ? "" : dtSelect("dxt", "")}
         <button class="ghost small" data-act="diceExAdd" data-g="1">+ add</button><button class="ghost small" data-act="diceExAdd" data-g="-1">− subtract</button>
         <label class="right">Bonus <input id="dxb" type="number" value="${+c.bonus || 0}" style="width:64px" data-act-input="diceBonus"></label></div>
-      <div class="dicebtns">${d20 ? `<button class="ghost" data-act="diceGo" data-m="dis">Disadvantage</button><button data-act="diceGo" data-m="normal">Normal</button><button class="ghost" data-act="diceGo" data-m="adv">Advantage</button>`
+      ${c.minDie ? `<div class="small" style="margin:0 0 6px">⚔ <b>${esc(c.minDie.label)}</b>: weapon damage dice that roll ${c.minDie.v === 3 ? "1 or 2" : "below " + c.minDie.v} count as ${c.minDie.v}</div>` : ""}
+      ${d20 && c.suggest === "adv" ? `<div class="chip acc" style="margin:0 0 6px">▲ Advantage — ${esc(c.why || "")}</div>` : ""}
+      <div class="dicebtns">${d20 ? `<button class="ghost" data-act="diceGo" data-m="dis">Disadvantage</button><button class="${c.suggest === "adv" ? "ghost" : ""}" data-act="diceGo" data-m="normal">Normal</button><button class="${c.suggest === "adv" ? "suggest" : "ghost"}" data-act="diceGo" data-m="adv">Advantage</button>`
         : c.crit ? `<button data-act="diceGo" data-m="crit">Roll critical damage</button><button class="ghost" data-act="diceGo" data-m="normal">Roll normal</button>`
         : `<button data-act="diceGo" data-m="normal">Roll</button><button class="ghost" data-act="diceGo" data-m="crit">Critical hit (double dice)</button>`}</div></div>`;
   },
@@ -126,7 +128,7 @@ const Dice = {
       dice.push({ n: mode === "normal" ? 1 : 2, s: 20, sign: 1, keep: mode === "adv" ? "high" : mode === "dis" ? "low" : null });
       flat += c.mod - this.exhaustion();
     } else {
-      c.parts.forEach(p => { const q = this.parse(p.f, p.type); dice = dice.concat(q.dice); if (q.flat) tflat[dtKey(p.type)] = (tflat[dtKey(p.type)] || 0) + q.flat; });
+      c.parts.forEach(p => { const q = this.parse(p.f, p.type); dice = dice.concat(c.minDie ? q.dice.map(d => ({ ...d, min: c.minDie.v, minLbl: c.minDie.label })) : q.dice); if (q.flat) tflat[dtKey(p.type)] = (tflat[dtKey(p.type)] || 0) + q.flat; });
       if (flat) tflat[T0] = (tflat[T0] || 0) + flat;
       flat = 0;
     }
@@ -153,12 +155,12 @@ const Dice = {
       const vals = Array.from({ length: g.n }, () => rollDie(g.s));
       let keepIdx = null;
       if (g.keep && vals.length === 2) keepIdx = g.keep === "high" ? (vals[0] >= vals[1] ? 0 : 1) : (vals[0] <= vals[1] ? 0 : 1);
-      vals.forEach((v, i) => res.push({ s: g.s, v, sign: g.sign, type: g.type || "", dropped: keepIdx !== null && i !== keepIdx, d20: g.s === 20 && isD20 }));
+      vals.forEach((v, i) => { const boost = g.min && v < g.min; res.push({ s: g.s, v: boost ? g.min : v, raw: v, boost: boost ? g.minLbl : "", sign: g.sign, type: g.type || "", dropped: keepIdx !== null && i !== keepIdx, d20: g.s === 20 && isD20 }); });
     }
     const total = res.filter(r => !r.dropped).reduce((t, r) => t + r.sign * r.v, 0) + flat;
     const nat = res.find(r => r.d20 && !r.dropped);
     const crit = nat && nat.v === 20, fumble = nat && nat.v === 1;
-    const parts = res.map((r, i) => `${i ? (r.sign < 0 ? " − " : " + ") : r.sign < 0 ? "−" : ""}${r.dropped ? `<s>${r.v}</s>` : r.v}<small> (d${r.s}${r.dropped ? " dropped" : ""})</small>`).join("");
+    const parts = res.map((r, i) => `${i ? (r.sign < 0 ? " − " : " + ") : r.sign < 0 ? "−" : ""}${r.dropped ? `<s>${r.v}</s>` : r.boost ? `<s>${r.raw}</s>→${r.v}` : r.v}<small> (d${r.s}${r.dropped ? " dropped" : ""})</small>`).join("");
     const breakdown = parts + (flat ? ` ${flat < 0 ? "−" : "+"} ${Math.abs(flat)}` : "");
     // damage by type
     let split = null;
@@ -184,6 +186,7 @@ const Dice = {
       <div class="dicerow">${res.map((r, i) => this.svg(r.s, 1 + Math.floor(Math.random() * r.s), "rolling" + (r.sign < 0 ? " neg" : ""), r.type ? this.dieColor(r.type) : null)).join("")}</div>
       <div class="dicetotal hidden">${total}</div><div class="dicesplit hidden">${splitHtml}</div><div class="dicebd hidden">${breakdown}</div>
       <div class="dicenat hidden">${crit ? "NATURAL 20!" : fumble ? "Natural 1…" : ""}</div>
+      ${res.some(r => r.boost) ? `<div class="diceboostnote hidden">⚔ ${esc(res.find(r => r.boost).boost)}: ${res.filter(r => r.boost).map(r => r.raw + "→" + r.v).join(", ")}</div>` : ""}
       <div class="hidden dicefoot" style="margin-top:12px"><div class="row" style="justify-content:center"><button class="ghost" data-act="diceAgain">Roll again</button><button data-act="diceResClose">OK</button></div>
         ${res.some(r => r.d20) && S.char?.play?.inspiration ? `<div class="row" style="justify-content:center;margin-top:10px"><button class="inspbtn" data-act="diceInsp" title="Heroic Inspiration: reroll and use the new roll">★ Use Heroic Inspiration (reroll)</button></div>` : ""}
         ${nx ? `<div class="row" style="justify-content:center;margin-top:10px"><button class="hitbtn ${crit ? "crit" : ""}" data-act="diceNext">${crit ? "⚔ Critical hit → damage" : "⚔ Hit → damage"}</button></div>` : ""}</div></div>`;
@@ -194,6 +197,12 @@ const Dice = {
       dies.forEach((d, i) => {
         const r = res[i]; const end = 650 + i * 110;
         if (t < end) { all = false; d.querySelector("text").textContent = 1 + Math.floor(Math.random() * r.s); }
+        else if (r.boost && !d.classList.contains("boosted")) {
+          // feat at work: show the real roll first, then lift it
+          if (!d.classList.contains("landed")) { d.querySelector("text").textContent = r.raw; d.classList.remove("rolling"); d.classList.add("landed"); }
+          if (t < end + 650) all = false;
+          else { d.querySelector("text").textContent = r.v; d.classList.add("boosted"); d.insertAdjacentHTML("beforeend", `<span class="boosttag">${r.boost === "Great Weapon Fighting" ? "GWF" : esc(r.boost)}</span>`); }
+        }
         else if (!d.classList.contains("landed")) {
           d.querySelector("text").textContent = r.v; d.classList.remove("rolling"); d.classList.add("landed");
           if (r.dropped) d.classList.add("dropped");
@@ -202,7 +211,7 @@ const Dice = {
       });
       if (all) {
         clearInterval(tick);
-        ["dicetotal", "dicebd", "dicefoot", "dicesplit"].forEach(k => el.querySelector("." + k).classList.remove("hidden"));
+        ["dicetotal", "dicebd", "dicefoot", "dicesplit", "diceboostnote"].forEach(k => el.querySelector("." + k)?.classList.remove("hidden"));
         if (crit || fumble) el.querySelector(".dicenat").classList.remove("hidden");
         el.querySelector(".dicetotal").classList.toggle("crit", !!crit); el.querySelector(".dicetotal").classList.toggle("fumble", !!fumble);
         try { navigator.vibrate && navigator.vibrate(crit ? [40, 60, 40] : 25); } catch (e) { }

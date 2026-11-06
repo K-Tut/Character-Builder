@@ -407,3 +407,7 @@ function choiceText(ch, opt) {
   parts.push(ch.reset === "LR" ? "You can change this when you finish a Long Rest." : ch.reset === "SR" ? "You pick this again whenever you finish a Short or Long Rest." : "Chosen when you gain this feature.");
   return parts.join("\n\n");
 }
+
+// feats from newer books that need numbers on the sheet
+FEATS["Purple Dragon Commandant"] = { ...(FEATS["Purple Dragon Commandant"] || {}), cat: "general", abil: ["str", "dex"],
+  res: { name: "Encourage Ally", reset: "LR", n: (l, c) => c.pb, note: "Bonus Action: ally gains 2d6 + mod Temp HP" } };

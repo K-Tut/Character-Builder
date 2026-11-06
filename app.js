@@ -441,7 +441,8 @@ function derive(c) {
     const dtype = dtKey(base.type), exType = dtFrom(w.extra) || dtype;
     const parts = [{ f: (dice === "1" && base.cat === "unarmed" && !D.cls.monk) ? String(Math.max(1, 1 + D.mod.str)) : `${dice}${dmod ? sgn(dmod) : ""}`, type: dtype }];
     if (exDice) parts.push({ f: exDice[0].replace(/\s+/g, ""), type: exType });
-    return { kind: "weapon", parts, dtype, ranged, heavy: props.includes("heavy"), dmgFormula, name: w.name || base.name, mastery, ab, abMod: D.mod[ab], baseProps: base.props, props: [base.props, mastery && "Mastery: " + mastery].filter(Boolean).join("; "), hit, dmg: dmg + (w.extra ? " + " + w.extra : ""), formula: `d20+${ABBR[ab]}${proficient ? "+Prof" : ""}${magic ? "+" + magic : ""}`, dformula: `${dice}+${ABBR[ab]}`, notes: w.notes || "" };
+    const gwf = !ranged && (props.includes("two-handed") || (props.includes("versatile") && !c.shield)) && (styles.includes("Great Weapon Fighting") || D.feats.some(f => f.name === "Great Weapon Fighting"));
+    return { kind: "weapon", parts, dtype, ranged, heavy: props.includes("heavy"), gwf, dmgFormula, name: w.name || base.name, mastery, ab, abMod: D.mod[ab], baseProps: base.props, props: [base.props, mastery && "Mastery: " + mastery].filter(Boolean).join("; "), hit, dmg: dmg + (w.extra ? " + " + w.extra : ""), formula: `d20+${ABBR[ab]}${proficient ? "+Prof" : ""}${magic ? "+" + magic : ""}`, dformula: `${dice}+${ABBR[ab]}`, notes: w.notes || "" };
   });
 
   // spell attacks you added in the Attacks card

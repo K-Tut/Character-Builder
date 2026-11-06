@@ -26,6 +26,28 @@ function attackById(D, id) { return id[0] === "w" ? D.attacks[+id.slice(1)] : D.
 const SMITES = [["Divine Smite", 1, 2, 8, 1, "radiant"], ["Searing Smite", 1, 1, 6, 1, "fire"], ["Thunderous Smite", 1, 2, 6, 1, "thunder"], ["Wrathful Smite", 1, 1, 6, 1, "necrotic"],
   ["Shining Smite", 2, 2, 6, 1, "radiant"], ["Blinding Smite", 3, 3, 8, 1, "radiant"], ["Staggering Smite", 4, 4, 6, 1, "psychic"], ["Banishing Smite", 5, 5, 10, 0, "force"]];
 // what can be added to the damage of this attack once it hits
+// what it costs to use: "A" action, "BA" bonus action, "R" reaction (from a spell's casting time or the rules text)
+const ACT_TAG = { A: ["Action", "ta-a"], BA: ["Bonus", "ta-b"], R: ["Reaction", "ta-r"] };
+function actKind(text, time) {
+  const t = String(time || "").toLowerCase();
+  if (t) return /bonus/.test(t) ? "BA" : /reaction/.test(t) ? "R" : /\baction\b/.test(t) ? "A" : "";
+  const s = String(text || ""), hits = [["BA", /\bbonus action\b/i], ["R", /\b(?:your |a |use (?:your|its) )?reaction\b/i], ["A", /\b(?:magic action|as an action|take an action|an action to|utilize action)\b/i]]
+    .map(([k, rx]) => { const m = s.match(rx); return m ? [k, m.index] : null; }).filter(Boolean).sort((a, b) => a[1] - b[1]);
+  return hits.length ? hits[0][0] : "";
+}
+function actTag(k) { return k && ACT_TAG[k] ? `<span class="acttag ${ACT_TAG[k][1]}">${ACT_TAG[k][0]}</span>` : ""; }
+function resKind(r, feats) {
+  if (r.spell) return actKind("", spellInfo(r.spell)?.time);
+  const f = feats.find(x => x.res === r) || feats.find(x => r.feature && norm(x.name) === norm(r.feature));
+  return actKind(f?.text || lookup(r.feature || r.name));
+}
+function isBloodied(c, D) { const hp = c.play?.hp ?? D.hpMax; return hp > 0 && hp <= Math.floor(D.hpMax / 2); }
+// reasons the character has Advantage on attack rolls right now
+function advantageHints(c, D) {
+  const out = [];
+  if (isBloodied(c, D) && D.feats.some(f => f.name === "Purple Dragon Commandant")) out.push("Last Stand: you're Bloodied");
+  return out;
+}
 function damageRiders(c, D, a) {
   const out = [], W = a.kind === "weapon", melee = W && !a.ranged, T = a.dtype || (a.parts[0] || {}).type || "";
   const inv = (c.pools || {}).invocations || [];
@@ -87,11 +109,12 @@ function renderSheet() {
   const hp = Math.min(P.hp ?? D.hpMax, D.hpMax);
   const pct = Math.max(0, Math.min(100, 100 * hp / D.hpMax));
   const bg = bgData(c);
-  let h = `<div class="card"><div class="hero">${c.portrait ? `<img src="${c.thumb || c.portrait}" data-act="viewPortrait" title="Show the whole image" style="cursor:zoom-in">` : ""}<div class="grow"><h2>${esc(c.name)}</h2>
-    <div>${esc(classLine(D))}</div><div class="muted small">${esc([D.species ? D.species.name + (c.species.choice ? " (" + c.species.choice + ")" : "") : "", bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div></div>
-    <div class="row"><button data-act="levelup">⬆ Level up</button><button class="ghost" data-act="shortRest">☕ Short rest</button><button class="ghost" data-act="longRest">🌙 Long rest</button>
-    <button class="ghost" data-act="exportJson" title="Export this character as a file">⤓ Export</button>
-    <button class="ghost ${P.inspiration ? "on" : ""}" data-act="insp" style="${P.inspiration ? "background:var(--accent-soft);border-color:var(--accent)" : ""}">${P.inspiration ? "★" : "☆"} Heroic Inspiration</button></div></div></div>`;
+  const bloodied = isBloodied(c, D);
+  let h = `<div class="card"><div class="hero">${c.portrait || c.thumb ? `<div class="heroimg ${bloodied ? "bloodied" : ""}" title="${bloodied ? "Bloodied" : ""}"><img src="${c.portrait || c.thumb}" data-act="viewPortrait" title="Show the whole image"></div>` : ""}
+    <div class="grow herobody"><div class="herotop"><h2>${esc(c.name)}</h2>
+      <span class="herotools"><button class="ghost small inspbtn2 ${P.inspiration ? "on" : ""}" data-act="insp" title="Heroic Inspiration">${P.inspiration ? "★" : "☆"} Inspiration</button><button class="ghost small" data-act="exportJson" title="Export this character as a file">⤓</button></span></div>
+    <div>${esc(classLine(D))}${bloodied ? ' <span class="chip bloodchip">🩸 Bloodied</span>' : ""}</div><div class="muted small">${esc([D.species ? D.species.name + (c.species.choice ? " (" + c.species.choice + ")" : "") : "", bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div>
+    <div class="row heroact"><button data-act="levelup">⬆ Level up</button><button class="ghost" data-act="shortRest">☕ Short rest</button><button class="ghost" data-act="longRest">🌙 Long rest</button></div></div></div></div>`;
 
   // column 1: abilities & skills
   let c1 = `<div class="card"><h3>Abilities</h3><div class="abil small muted"><span></span><span class="num">Score</span><span class="num">Mod</span><span class="num">Save</span></div>
@@ -125,7 +148,8 @@ function renderSheet() {
         <td class="roll" ${ATK("s" + i, "dmg")}>${a.parts.map(partText).join(" + ") || '<span class="muted">—</span>'}</td></tr>`).join("")}</table>
       <p class="small muted" style="margin:6px 0 0">🎲 Tap the hit bonus to attack — on a hit tap “Hit” to roll damage (with smites, Hex …).</p>` : '<p class="muted small">Add weapons in Build → Equipment, or ＋ a spell attack.</p>'}
     ${D.cls.rogue ? `<p class="small">Sneak Attack: <b class="roll" ${RD("Sneak Attack", Math.ceil(D.cls.rogue / 2) + "d6")}>🎲 ${Math.ceil(D.cls.rogue / 2)}d6</b></p>` : ""}${D.cls.barbarian ? `<p class="small">Rage damage: <b>+${at(step({ 1: 2, 9: 3, 16: 4 }), D.cls.barbarian)}</b></p>` : ""}</div>`;
-  if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b class="resname" data-act="resInfo" data-k="${esc(r.key)}" title="Show description">${esc(r.name)} <span class="small muted">ⓘ</span></b>${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${r.key === "portent" ? portentDice(r, P) : pips(r.key, r.max, P.used[r.key])}</div>
+  const featsAll = D.resources.length ? collectFeatures(c, D) : [];
+  if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b class="resname" data-act="resInfo" data-k="${esc(r.key)}" title="Show description">${esc(r.name)} <span class="small muted">ⓘ</span></b>${actTag(resKind(r, featsAll))}${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${r.key === "portent" ? portentDice(r, P) : pips(r.key, r.max, P.used[r.key])}</div>
     ${r.forms ? `<div class="row small formrow">${(P.active || {})[r.key] ? `<span class="chip acc">Active: ${esc(P.active[r.key])}</span><a href="#" data-act="endForm" data-k="${r.key}">end</a>` : `<span class="muted">Use as:</span>${r.forms.map(f => `<button class="small ghost" data-act="useForm" data-k="${r.key}" data-f="${esc(f)}">${esc(f)}</button>`).join("")}`}</div>` : ""}`).join("")}</div>`;
   if (D.slots.length || D.pact) c2 += `<div class="card"><h3>Spell slots</h3>${slotRows(D, P)}</div>`;
   c2 += `<div class="card"><h3>Conditions</h3><div>${CONDITIONS.map(x => `<span class="chip ${P.conditions.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="cond" data-v="${x}">${x}</span>`).join("")}</div>
@@ -148,7 +172,7 @@ function renderSheet() {
 }
 
 function featRow(f) {
-  return `<div class="feat"><div class="h" data-act="toggleOpen"><b>${esc(f.name)}</b>${f.note ? `<span class="chip">${esc(f.note)}</span>` : ""}<span class="src">${esc(f.src)}</span>
+  return `<div class="feat"><div class="h" data-act="toggleOpen"><b>${esc(f.name)}</b>${f.active ? actTag(actKind(f.text)) : ""}${f.note ? `<span class="chip">${esc(f.note)}</span>` : ""}<span class="src">${esc(f.src)}</span>
     <button class="small ghost" data-act="featEdit" data-k="${esc(f.key)}" title="Edit">✎</button></div>
     <div class="body hidden"><div class="desc">${diceLinks(para(f.text), f.name) || '<span class="muted">No description — click ✎ to add one.</span>'}</div></div></div>`;
 }
@@ -175,9 +199,15 @@ function sheetSpells(c, D) {
     + (D.speciesCast && D.alwaysSpells.some(s => s.cls === "species") ? `<span class="chip acc roll" ${R(D.speciesCast.name + " spell attack", D.speciesCast.atk)}>${esc(D.speciesCast.name)} spells: DC ${D.speciesCast.dc} · Atk ${sgn(D.speciesCast.atk)} (${ABBR[D.speciesCast.ability]}) 🎲</span>` : "") + `<button class="small ghost" data-act="goSpells" style="margin-left:6px">Change spells</button>`;
   if (D.slots.length || D.pact) h += `<div class="spslots"><h3 style="margin:10px 0 4px">Spell slots</h3>${slotRows(D, c.play)}</div>`;
   if (!Object.keys(groups).length) return h + `<p class="muted">No spells.</p>`;
+  const F = S.ui.spf || "", FILT = [["", "All"], ["A", "Action"], ["BA", "Bonus action"], ["R", "Reaction"], ["rit", "Ritual"], ["conc", "Concentration"]];
+  const pass = s => !F || (F === "rit" ? s.si?.ritual : F === "conc" ? s.si?.conc : actKind("", s.si?.time) === F);
+  h += `<div class="spfilter">${FILT.map(([k, l]) => `<button class="small ${F === k ? "" : "ghost"}" data-act="spFilter" data-f="${k}">${l}</button>`).join("")}</div>`;
+  for (const k in groups) groups[k] = groups[k].filter(pass);
+  for (const k in groups) if (!groups[k].length) delete groups[k];
+  if (!Object.keys(groups).length) h += `<p class="muted small">No spells match this filter.</p>`;
   for (const l of Object.keys(groups).sort((a, b) => (a === "?" ? 99 : a) - (b === "?" ? 99 : b))) {
     h += `<h3 style="margin-top:12px">${l === "?" ? "Other spells" : +l ? "Level " + l : "Cantrips"}</h3>`;
-    h += groups[l].sort((a, b) => a.name.localeCompare(b.name)).map(s => `<div class="spell"><div class="h" data-act="toggleOpen"><b style="flex:1">${esc(s.name)}</b>${s.si?.school ? `<span class="tag school">${esc(s.si.school)}</span>` : ""}${s.si?.conc ? '<span class="tag">C</span>' : ""}${s.si?.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.si?.time || "")}${s.si?.range ? " · " + esc(s.si.range) : ""}</span><span class="tag">${esc(s.src)}${s.always ? " ★" : ""}</span>${freePips(s.name, D, c)}</div>
+    h += groups[l].sort((a, b) => a.name.localeCompare(b.name)).map(s => `<div class="spell"><div class="h" data-act="toggleOpen"><b style="flex:1">${esc(s.name)}</b>${s.si?.school ? `<span class="tag school">${esc(s.si.school)}</span>` : ""}${s.si?.conc ? '<span class="tag">C</span>' : ""}${s.si?.ritual ? '<span class="tag">R</span>' : ""}${actTag(actKind("", s.si?.time))}<span class="muted small">${esc(s.si?.time || "")}${s.si?.range ? " · " + esc(s.si.range) : ""}</span><span class="tag">${esc(s.src)}${s.always ? " ★" : ""}</span>${freePips(s.name, D, c)}</div>
       <div class="body hidden">${+l ? freeToggle(s.name, D, c) : ""}${s.si ? `<div class="meta">${esc([s.si.time && "Casting time: " + s.si.time, s.si.range && "Range: " + s.si.range, s.si.comp && "Components: " + s.si.comp, s.si.dur && "Duration: " + s.si.dur].filter(Boolean).join(" · "))}</div><div class="desc">${diceLinks(para(s.si.text), s.name)}</div>` : '<span class="muted small">No description imported.</span>'}</div></div>`).join("");
   }
   return h;
@@ -192,8 +222,26 @@ function renderModalInner() {
   if (!S.modal) { bg.classList.add("hidden"); return; }
   bg.classList.remove("hidden");
   const st = box.scrollTop;
-  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, longRest: mLongRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin }[S.modal.type]();
+  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, longRest: mLongRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin, group: mGroup }[S.modal.type]();
   box.scrollTop = st;
+}
+
+function mGroup() {
+  const m = S.modal, others = [...new Set(S.chars.map(c => c.group).filter(g => g && g !== m.orig))];
+  return `<h2>${m.orig ? "Edit group" : "New group"}</h2>
+    <label>Group name<br><input id="grpname" value="${esc(m.name)}" placeholder="e.g. Red Knights" style="width:100%"></label>
+    <p class="small muted" style="margin:10px 0 4px">Characters in this group:</p>
+    <div class="grppick">${S.chars.map(c => `<label class="grprow"><input type="checkbox" data-act="grpToggle" data-id="${esc(c.id)}" ${m.ids.includes(c.id) ? "checked" : ""}>
+      ${c.thumb ? `<img src="${c.thumb}">` : `<span class="ph">🛡</span>`}<span class="grow"><b>${esc(c.name)}</b>${c.group && c.group !== m.orig ? `<span class="small muted"> · now in ${esc(c.group)}</span>` : ""}</span></label>`).join("")}</div>
+    ${others.length ? `<p class="small muted">A character can be in one group; ticking it here moves it.</p>` : ""}
+    <div class="foot">${m.orig ? `<button class="ghost" data-act="grpDelete">Ungroup all</button>` : ""}<button class="ghost" data-act="modalClose">Cancel</button><button data-act="grpSave">Save group</button></div>`;
+}
+async function setCharGroup(ids, name) {
+  for (const id of ids) {
+    const c = S.char && S.char.id === id ? S.char : await DB.getChar(id); if (!c) continue;
+    c.group = name; c._updated = Date.now(); await DB.putChar(JSON.parse(JSON.stringify(c))); if (typeof Folder !== "undefined") Folder.push(c);
+  }
+  Sync.soon(); await loadChars();
 }
 
 function startLevelUp() {
@@ -381,6 +429,21 @@ const ACT = {
   theme: () => { const r = document.documentElement; const d = r.dataset.theme === "dark" ? "light" : "dark"; r.dataset.theme = d; try { localStorage.setItem("theme", d); } catch (e) { } },
   new: async () => { S.char = newChar(); await save(true); S.view = "builder"; S.tab = "basics"; render(); },
   open: el => openChar(el.dataset.id),
+  spFilter: el => { S.ui.spf = el.dataset.f; render(); },
+  groupToggle: (el, e) => { if (e.target.closest("[data-act=groupEdit]")) return; const g = el.dataset.g, o = openGroups(); const i = o.indexOf(g); i >= 0 ? o.splice(i, 1) : o.push(g); try { localStorage.setItem("openGroups", JSON.stringify(o)); } catch (x) { } render(); },
+  groupEdit: (el, e) => { e?.stopPropagation(); const g = el.dataset.g || ""; openModal({ type: "group", orig: g, name: g, ids: S.chars.filter(c => g && c.group === g).map(c => c.id) }); },
+  grpToggle: el => { const m = S.modal, id = el.dataset.id; m.name = $("#grpname").value; m.ids = el.checked ? [...new Set([...m.ids, id])] : m.ids.filter(x => x !== id); renderModal(); },
+  grpSave: async () => {
+    const m = S.modal, name = $("#grpname").value.trim();
+    if (!name) return toast("Give the group a name");
+    if (!m.ids.length) return toast("Tick at least one character");
+    const before = S.chars.filter(c => m.orig && c.group === m.orig && !m.ids.includes(c.id)).map(c => c.id);
+    await setCharGroup(before, ""); await setCharGroup(m.ids, name);
+    const o = openGroups().filter(g => g !== m.orig); o.push(name); try { localStorage.setItem("openGroups", JSON.stringify(o)); } catch (x) { }
+    closeModal(); render(); toast("Group saved");
+  },
+  grpDelete: async () => { const m = S.modal; if (!confirm(`Remove the group "${m.orig}"? The characters stay, they just aren't grouped any more.`)) return;
+    await setCharGroup(S.chars.filter(c => c.group === m.orig).map(c => c.id), ""); closeModal(); render(); },
   view: el => { S.view = el.dataset.v; render(); window.scrollTo(0, 0); },
   tab: el => { S.tab = el.dataset.t; render(); window.scrollTo(0, 0); },
   sheetTab: el => { S.sheetTab = el.dataset.k; render(); },
@@ -508,8 +571,9 @@ const ACT = {
     S.char = S.draft; closeModal(); save(true); render(); toast(`Level ${D.level}! Max HP ${D.hpMax}`);
   },
   atkRoll: (el, e) => { e.stopPropagation(); const c = S.char, D = derive(c), a = attackById(D, el.dataset.at); if (!a) return;
-    const dmg = { title: a.name + " damage", parts: a.parts, riders: damageRiders(c, D, a), note: a.note || "" };
-    if (el.dataset.k === "hit") Dice.ask({ kind: "d20", title: a.name + " attack", mod: a.hit, then: dmg });
+    const dmg = { title: a.name + " damage", parts: a.parts, riders: damageRiders(c, D, a), note: a.note || "", minDie: a.gwf ? { v: 3, label: "Great Weapon Fighting" } : null };
+    const adv = advantageHints(c, D);
+    if (el.dataset.k === "hit") Dice.ask({ kind: "d20", title: a.name + " attack", mod: a.hit, then: dmg, suggest: adv.length ? "adv" : "", why: adv.join(" · ") });
     else Dice.ask({ kind: "dmg", ...dmg }); },
   wpnNew: () => { S.ui.wpnAdd = !S.ui.wpnAdd; render(); },
   wpnAdd: () => { const n = $("#addw2").value; S.char.weapons.push({ name: n, base: n, magic: +$("#addw2m").value || 0 }); S.ui.wpnAdd = false; save(); render(); toast(n + " added to your equipment"); },
@@ -639,7 +703,8 @@ $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && 
 
 // ---------- init ----------
 (async function init() {
-  try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) { }
+  let t = "dark"; try { t = localStorage.getItem("theme") || "dark"; } catch (e) { }   // dark is the default
+  document.documentElement.dataset.theme = t;
   S.settings = (await DB.get("settings")) || {};
   const w = await DB.get("wiki"); if (w) { S.wiki = w; } buildIndex();
   S.server = await detectServer();
