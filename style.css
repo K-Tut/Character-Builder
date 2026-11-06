@@ -94,7 +94,7 @@ details > summary { cursor: pointer; }
 @media (max-width: 1150px) { .sheet { grid-template-columns: 260px minmax(0, 1fr); } .sheet > .col3 { grid-column: 1 / -1; } }
 @media (max-width: 760px) { .sheet { grid-template-columns: 1fr; } }
 .hero { display: flex; gap: 16px; align-items: stretch; }
-.heroimg { flex: none; width: 128px; aspect-ratio: 3 / 4; border-radius: 12px; overflow: hidden; position: relative; background: var(--chip); }
+.heroimg { flex: none; width: 128px; min-height: 150px; align-self: stretch; border-radius: 12px; overflow: hidden; position: relative; background: var(--chip); }
 .heroimg img { width: 100%; height: 100%; object-fit: cover; object-position: center 22%; display: block; cursor: zoom-in; }
 .heroimg.bloodied { animation: bloodpulse 1.8s ease-in-out infinite; }
 .heroimg.bloodied::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 45%, rgba(200,20,20,.55)); animation: bloodfade 1.8s ease-in-out infinite; }
@@ -102,10 +102,11 @@ details > summary { cursor: pointer; }
 @keyframes bloodfade { 0%, 100% { opacity: .35; } 50% { opacity: .9; } }
 .bloodchip { background: rgba(200,30,30,.18); color: #e05545; font-weight: 700; }
 .herobody { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.herotop { display: flex; align-items: flex-start; gap: 8px; }
-.herotools { margin-left: auto; display: flex; gap: 6px; flex: none; }
 .inspbtn2.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.heroact { margin-top: auto; padding-top: 6px; }
+.heroact { margin-top: auto; padding-top: 6px; display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
+.herorow { display: flex; gap: 6px; }
+.herorow button { flex: 1 1 0; white-space: nowrap; }
+.herorow button.heroexp { flex: 0 0 auto; }
 .hero h2 { margin: 0; font-size: 24px; overflow-wrap: anywhere; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .stat { border: 1px solid var(--line); border-radius: 10px; text-align: center; padding: 6px 4px; background: var(--panel); }
@@ -160,12 +161,10 @@ details > summary { cursor: pointer; }
   .card { padding: 12px; border-radius: 12px; }
   .tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
   .tabs button { white-space: nowrap; }
-  .heroimg { width: 104px; }
   .hero { gap: 12px; }
-  .hero h2 { font-size: 20px; }
-  .herotools .inspbtn2 { padding: 3px 7px; }
-  .heroact { gap: 6px; }
-  .heroact button { flex: 1 1 auto; padding: 8px 6px; font-size: 12.5px; }
+  .heroimg { width: 100px; min-height: 130px; }
+  .hero h2 { font-size: clamp(16px, 5vw, 20px); }
+  .heroact button { padding: 8px 6px; font-size: 12.5px; }
   .sheet .col1, .sheet .col2, .sheet .col3 { display: none; }
   .sheet.m-stats .col1, .sheet.m-combat .col2, .sheet.m-col3 .col3 { display: block; }
   .sheet.m-col3 .col3 .subtabs { display: none; }

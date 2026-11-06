@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-06b";
+const APP_VERSION = "2026-11-06c";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -104,11 +104,21 @@ function renderInner() {
   else if (S.view === "table") { Party.mapNew = false; m.innerHTML = renderPartyTable(); }
   window.scrollTo(0, y);
   if (S.view === "table") { bindPartyMap(); drawPartyMap(); }
+  if (S.view === "sheet") fitHeroName();
   if (typeof renderPartyChip === "function") renderPartyChip();
   renderModal();
   if (typeof Dice !== "undefined") Dice.sync();
 }
 
+// shrink a long character name until it fits on one line (not below 14px; then it wraps)
+function fitHeroName() {
+  const h = document.querySelector(".hero h2"); if (!h) return;
+  h.style.fontSize = ""; h.style.whiteSpace = "nowrap";
+  let fs = parseFloat(getComputedStyle(h).fontSize);
+  while (h.scrollWidth > h.clientWidth + 1 && fs > 14) { fs -= 1; h.style.fontSize = fs + "px"; }
+  if (h.scrollWidth > h.clientWidth + 1) h.style.whiteSpace = "";
+}
+window.addEventListener("resize", () => { if (S.view === "sheet") fitHeroName(); });
 // ---------- HOME ----------
 const charCard = c => `<div class="card charcard" data-act="open" data-id="${esc(c.id)}">
       ${c.thumb ? `<img src="${c.thumb}">` : `<div class="ph">🛡</div>`}

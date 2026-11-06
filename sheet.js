@@ -45,7 +45,7 @@ function isBloodied(c, D) { const hp = c.play?.hp ?? D.hpMax; return hp > 0 && h
 // reasons the character has Advantage on attack rolls right now
 function advantageHints(c, D) {
   const out = [];
-  if (isBloodied(c, D) && D.feats.some(f => f.name === "Purple Dragon Commandant")) out.push("Last Stand: you're Bloodied");
+  if (isBloodied(c, D) && D.feats.some(f => f.name === "Purple Dragon Commandant")) out.push("Last Stand (Purple Dragon Commandant)");
   return out;
 }
 function damageRiders(c, D, a) {
@@ -110,11 +110,11 @@ function renderSheet() {
   const pct = Math.max(0, Math.min(100, 100 * hp / D.hpMax));
   const bg = bgData(c);
   const bloodied = isBloodied(c, D);
-  let h = `<div class="card"><div class="hero">${c.portrait || c.thumb ? `<div class="heroimg ${bloodied ? "bloodied" : ""}" title="${bloodied ? "Bloodied" : ""}"><img src="${c.portrait || c.thumb}" data-act="viewPortrait" title="Show the whole image"></div>` : ""}
-    <div class="grow herobody"><div class="herotop"><h2>${esc(c.name)}</h2>
-      <span class="herotools"><button class="ghost small inspbtn2 ${P.inspiration ? "on" : ""}" data-act="insp" title="Heroic Inspiration">${P.inspiration ? "★" : "☆"} Inspiration</button><button class="ghost small" data-act="exportJson" title="Export this character as a file">⤓</button></span></div>
-    <div>${esc(classLine(D))}${bloodied ? ' <span class="chip bloodchip">🩸 Bloodied</span>' : ""}</div><div class="muted small">${esc([D.species ? D.species.name + (c.species.choice ? " (" + c.species.choice + ")" : "") : "", bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div>
-    <div class="row heroact"><button data-act="levelup">⬆ Level up</button><button class="ghost" data-act="shortRest">☕ Short rest</button><button class="ghost" data-act="longRest">🌙 Long rest</button></div></div></div></div>`;
+  let h = `<div class="card"><div class="hero">${c.portrait || c.thumb ? `<div class="heroimg ${bloodied ? "bloodied" : ""}"><img src="${c.portrait || c.thumb}" data-act="viewPortrait" title="Show the whole image"></div>` : ""}
+    <div class="grow herobody"><h2>${esc(c.name)}</h2>
+    <div>${esc(classLine(D))}</div><div class="muted small">${esc([D.species ? D.species.name + (c.species.choice ? " (" + c.species.choice + ")" : "") : "", bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div>
+    <div class="heroact"><div class="herorow"><button data-act="levelup">⬆ Level up</button><button class="ghost inspbtn2 ${P.inspiration ? "on" : ""}" data-act="insp" title="Heroic Inspiration">${P.inspiration ? "★" : "☆"} Inspiration</button><button class="ghost heroexp" data-act="exportJson" title="Export this character as a file">⤓</button></div>
+      <div class="herorow"><button class="ghost" data-act="shortRest">☕ Short rest</button><button class="ghost" data-act="longRest">🌙 Long rest</button></div></div></div></div></div>`;
 
   // column 1: abilities & skills
   let c1 = `<div class="card"><h3>Abilities</h3><div class="abil small muted"><span></span><span class="num">Score</span><span class="num">Mod</span><span class="num">Save</span></div>
