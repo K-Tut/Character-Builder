@@ -411,3 +411,13 @@ function choiceText(ch, opt) {
 // feats from newer books that need numbers on the sheet
 FEATS["Purple Dragon Commandant"] = { ...(FEATS["Purple Dragon Commandant"] || {}), cat: "general", abil: ["str", "dex"],
   res: { name: "Encourage Ally", reset: "LR", n: (l, c) => c.pb, note: "Bonus Action: ally gains 2d6 + mod Temp HP" } };
+
+// Bonus dice on checks from feats/features. skills: skill names; abilities: ability check names ("Charisma").
+const CHECK_BONUS = [
+  { feat: "Arcane Eloquence", skills: ["Deception", "Intimidation", "Persuasion"], n: 1, s: 4, label: "Smooth Talker" }
+];
+function checkBonusDice(c, title) {
+  const m = String(title || "").match(/^(.+?) check$/i); if (!m) return [];
+  const what = m[1].trim(), feats = allFeats(c).map(f => f.name);
+  return CHECK_BONUS.filter(b => feats.includes(b.feat) && ((b.skills || []).includes(what) || (b.abilities || []).includes(what)));
+}
