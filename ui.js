@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-09a";
+const APP_VERSION = "2026-11-16a";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -105,11 +105,37 @@ function renderInner() {
   window.scrollTo(0, y);
   if (S.view === "table") { bindPartyMap(); drawPartyMap(); }
   if (S.view === "sheet") fitHeroName();
+  updateEnergyBar();
   if (typeof renderPartyChip === "function") renderPartyChip();
   renderModal();
   if (typeof Dice !== "undefined") Dice.sync();
 }
 
+// ---------- looks: dark / light / sci-fi ----------
+const THEME_ICON = { dark: "☾", light: "☀", scifi: "⌬" };
+function applyTheme(t) {
+  if (!THEME_ICON[t]) t = "dark";
+  document.documentElement.dataset.theme = t;
+  const b = document.getElementById("themebtn"); if (b) { b.textContent = THEME_ICON[t]; b.title = "Look: " + { dark: "dark", light: "light", scifi: "sci-fi" }[t] + " — tap to switch"; }
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t === "scifi" ? "#050b14" : "#8e1f1f";
+  if (t === "scifi" && !document.getElementById("scififont")) {
+    const l = document.createElement("link"); l.id = "scififont"; l.rel = "stylesheet";
+    l.href = "https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Rajdhani:wght@500;600;700&display=swap"; document.head.appendChild(l);
+  }
+}
+// sci-fi look: hit points as an energy bar along the left edge of the screen
+function updateEnergyBar() {
+  const el = document.getElementById("energybar"); if (!el) return;
+  const on = document.documentElement.dataset.theme === "scifi" && S.view === "sheet" && S.char && S.char.levels.length;
+  el.classList.toggle("hidden", !on); document.body.classList.toggle("hasenergy", !!on);
+  if (!on) return;
+  const D = derive(S.char), P = S.char.play, hp = Math.max(0, Math.min(P.hp ?? D.hpMax, D.hpMax)), pct = D.hpMax ? 100 * hp / D.hpMax : 0;
+  const tmp = Math.min(100 - pct, D.hpMax ? 100 * (+P.temp || 0) / D.hpMax : 0);
+  el.classList.toggle("low", pct <= 50); el.classList.toggle("zero", hp <= 0);
+  el.querySelector(".ebfill").style.height = pct + "%";
+  const t = el.querySelector(".ebtemp"); t.style.bottom = pct + "%"; t.style.height = tmp + "%";
+  el.querySelector(".ebtxt").innerHTML = `<b>${hp}</b><span>${D.hpMax}</span>${P.temp ? `<i>+${P.temp}</i>` : ""}`;
+}
 // shrink a long character name until it fits on one line (not below 14px; then it wraps)
 function fitHeroName() {
   const h = document.querySelector(".hero h2"); if (!h) return;

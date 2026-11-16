@@ -442,7 +442,9 @@ async function shareFile(name, text, title) {
 }
 const ACT = {
   home: async () => { save(true); S.view = "home"; S.char = null; await loadChars(); render(); },
-  theme: () => { const r = document.documentElement; const d = r.dataset.theme === "dark" ? "light" : "dark"; r.dataset.theme = d; try { localStorage.setItem("theme", d); } catch (e) { } },
+  theme: () => { const order = ["dark", "light", "scifi"], cur = document.documentElement.dataset.theme; const d = order[(order.indexOf(cur) + 1) % order.length];
+    applyTheme(d); try { localStorage.setItem("theme", d); } catch (e) { } render(); toast({ dark: "Dark mode", light: "Light mode", scifi: "Sci-fi mode" }[d]); },
+  energyTap: () => { S.mtab = "combat"; render(); document.querySelector(".hpbox")?.scrollIntoView({ behavior: "smooth", block: "center" }); },
   new: async () => { S.char = newChar(); await save(true); S.view = "builder"; S.tab = "basics"; render(); },
   open: el => openChar(el.dataset.id),
   dsRoll: () => Dice.ask({ kind: "d20", title: "Death saving throw", mod: 0, onDone: applyDeathSave }),
@@ -722,7 +724,7 @@ $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && 
 // ---------- init ----------
 (async function init() {
   let t = "dark"; try { t = localStorage.getItem("theme") || "dark"; } catch (e) { }   // dark is the default
-  document.documentElement.dataset.theme = t;
+  applyTheme(t);
   S.settings = (await DB.get("settings")) || {};
   const w = await DB.get("wiki"); if (w) { S.wiki = w; } buildIndex();
   S.server = await detectServer();
