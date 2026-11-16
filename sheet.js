@@ -259,7 +259,7 @@ function renderModalInner() {
   if (!S.modal) { bg.classList.add("hidden"); return; }
   bg.classList.remove("hidden");
   const st = box.scrollTop;
-  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, longRest: mLongRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin, group: mGroup }[S.modal.type]();
+  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, longRest: mLongRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin, group: mGroup, spellEdit: mSpellEdit }[S.modal.type]();
   box.scrollTop = st;
 }
 
@@ -503,7 +503,7 @@ const ACT = {
         const ex = await DB.getChar(c.id);
         if (ex && (ex._updated || 0) > (c._updated || 0) && !confirm(`The ${c.name} on this device is newer than the file. Replace it with the file anyway?`)) continue;
         if (ex) { c._driveId = ex._driveId; c._syncedAt = ex._syncedAt; }
-        migrate(c); await storeSaveChar(c); await mergeCustomItems(c); n++; last = c;
+        migrate(c); await storeSaveChar(c); await mergeCustomItems(c); await mergeCustomSpells(c); n++; last = c;
         }
       }
       await loadChars();
@@ -689,6 +689,7 @@ const ACT = {
   }
 };
 // change-type actions (inputs/selects/checkboxes)
+Object.assign(ACT, SPELL_ACT);
 const CHG = {
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },
   grpToggle: el => { const m = S.modal, id = el.dataset.id; m.name = $("#grpname").value; m.ids = el.checked ? [...new Set([...m.ids, id])] : m.ids.filter(x => x !== id); },
@@ -755,6 +756,7 @@ $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && 
   applyTheme(t);
   S.settings = (await DB.get("settings")) || {};
   S.customItems = (await DB.get("customItems")) || [];
+  S.customSpells = (await DB.get("customSpells")) || [];
   const w = await DB.get("wiki"); if (w) { S.wiki = w; } buildIndex();
   S.server = await detectServer();
   if (S.server) {

@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-16e";
+const APP_VERSION = "2026-11-16f";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -36,6 +36,7 @@ function save(now) {
   if (!S.char) return;
   const c = S.char;
   c._updated = Date.now();
+  syncHomebrew(c);
   const p = DB.putChar(JSON.parse(JSON.stringify(c)));   // write immediately (phone apps can be closed any moment)
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => { if (S.char === c) { c._summary = derive(c).summary; await DB.putChar(JSON.parse(JSON.stringify(c))); Folder.push(c); } }, 600);
@@ -524,6 +525,7 @@ function bSpells(c, D) {
     ${schools.length ? `<div class="row small" style="margin-top:6px;gap:4px"><span class="muted">School:</span><span class="chip ${fsch.length ? "" : "acc"}" style="cursor:pointer" data-act="spSchool" data-v="">All</span>${schools.map(x => `<span class="chip ${fsch.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="spSchool" data-v="${esc(x)}">${esc(x)}</span>`).join("")}</div>` : ""}
     ${cs && !S.idx.spellList.some(s => s.classes.includes(cs.list)) && S.idx.spellList.length ? `<p class="small warn">The imported rules text has no ${esc(cs.name)} spell list, so all spells up to level ${cs.maxLvl} are shown — pick the ones on your class list.</p>` : ""}
     <div id="splist">${spellList(c, D, cur, cs)}</div>
+    <div class="row" style="margin-top:10px"><button class="small" data-act="spNew">＋ New own spell</button><span class="small muted">Or open a spell and tap ⧉ to copy and change it.</span></div>
     <div class="row" style="margin-top:10px"><span class="small muted">Not in the list?</span><input id="spman" placeholder="Spell name"><select id="spmanl">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(l => `<option value="${l}">${l ? "Level " + l : "Cantrip"}</option>`).join("")}</select><button class="small" data-act="spellAddMan" data-c="${cur}">Add</button></div></div>`;
   return h;
 }
@@ -541,9 +543,75 @@ function spellList(c, D, cur, cs) {
   const groups = {}; list.slice(0, 400).forEach(s => (groups[s.level] ||= []).push(s));
   return Object.entries(groups).map(([lv, ss]) => `<h4 style="margin:10px 0 4px">${+lv ? "Level " + lv : "Cantrips"}</h4>` + ss.map(s => `
     <div class="spell"><div class="h"><input type="checkbox" data-act="spellToggle" data-n="${esc(s.name)}" data-l="${s.level}" data-c="${cur}" ${chosen.has(s.name) ? "checked" : ""}>
-    <b data-act="toggleOpen" style="flex:1">${esc(s.name)}</b><span class="tag">${esc(s.school)}</span>${s.conc ? '<span class="tag">C</span>' : ""}${s.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.time)}</span></div>
-    <div class="body hidden"><div class="meta">${esc([s.time && "Casting time: " + s.time, s.range && "Range: " + s.range, s.comp && "Components: " + s.comp, s.dur && "Duration: " + s.dur].filter(Boolean).join(" · "))}</div><div class="desc">${para(s.text)}</div></div></div>`).join("")).join("");
+    <b data-act="toggleOpen" style="flex:1">${esc(s.name)}</b>${s.custom ? '<span class="tag own">★ own</span>' : ""}<span class="tag">${esc(s.school)}</span>${s.conc ? '<span class="tag">C</span>' : ""}${s.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.time)}</span></div>
+    <div class="body hidden"><div class="meta">${esc([s.time && "Casting time: " + s.time, s.range && "Range: " + s.range, s.comp && "Components: " + s.comp, s.dur && "Duration: " + s.dur].filter(Boolean).join(" · "))}</div><div class="desc">${para(s.text)}</div>
+    <div class="row" style="margin-top:6px"><button class="small ghost" data-act="spCopy" data-n="${esc(s.name)}">⧉ Copy &amp; edit as my own spell</button>${s.custom ? `<button class="small ghost" data-act="spEdit" data-n="${esc(s.name)}">✎ Edit</button>` : ""}</div></div></div>`).join("")).join("");
 }
+
+// ---------- own spells (homebrew): made from scratch or copied from an existing spell ----------
+const SPELL_SCHOOLS = ["Abjuration", "Conjuration", "Divination", "Enchantment", "Evocation", "Illusion", "Necromancy", "Transmutation"];
+function syncHomebrew(c) {
+  const own = S.customSpells || []; if (!own.length && !c.homebrewSpells) return;
+  const names = new Set((c.spells || []).map(s => norm(s.name)).concat((c.freeCasts || []).map(norm)));
+  const keep = {}; for (const s of own) if (names.has(norm(s.name))) keep[norm(s.name)] = { ...s };
+  for (const [k, s] of Object.entries(c.homebrewSpells || {})) if (!keep[k] && names.has(k)) keep[k] = s;   // own spells from another device
+  c.homebrewSpells = keep;
+}
+async function saveCustomSpells() { await DB.set("customSpells", S.customSpells || []); buildIndex(); }
+async function mergeCustomSpells(c) {
+  let ch = false; S.customSpells ||= [];
+  for (const s of Object.values(c.homebrewSpells || {})) if (s?.name && !S.customSpells.some(x => norm(x.name) === norm(s.name))) { S.customSpells.push({ ...s, id: s.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 5) }); ch = true; }
+  if (ch) await saveCustomSpells();
+}
+function spellEditOpen(src, copy) {
+  const s = src ? { ...src } : { name: "", level: 1, school: "Evocation", time: "Action", range: "60 feet", comp: "V, S", dur: "Instantaneous", conc: false, ritual: false, classes: [], text: "" };
+  if (copy) { delete s.id; s.name = src.name + " (homebrew)"; }
+  openModal({ type: "spellEdit", d: { ...s, classes: [...(s.classes || [])] }, orig: copy ? "" : s.name, copyOf: copy ? src.name : "" });
+}
+function mSpellEdit() {
+  const d = S.modal.d, lists = [...new Set(Object.keys(CLASSES).concat((S.idx.spellList || []).flatMap(s => s.classes || [])))].filter(x => CLASSES[x]);
+  return `<h2>${S.modal.copyOf ? "Copy of " + esc(S.modal.copyOf) : d.id ? "Edit own spell" : "New spell"}</h2>
+    <div class="spform">
+      <label class="full">Name<input id="se_name" value="${esc(d.name)}"></label>
+      <label>Level<select id="se_level">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(l => `<option value="${l}" ${+d.level === l ? "selected" : ""}>${l ? "Level " + l : "Cantrip"}</option>`).join("")}</select></label>
+      <label>School<select id="se_school">${SPELL_SCHOOLS.map(x => `<option ${d.school === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>
+      <label>Casting time<input id="se_time" value="${esc(d.time || "")}" list="se_times"></label>
+      <label>Range<input id="se_range" value="${esc(d.range || "")}"></label>
+      <label>Components<input id="se_comp" value="${esc(d.comp || "")}"></label>
+      <label>Duration<input id="se_dur" value="${esc(d.dur || "")}"></label>
+      <label class="chk"><input type="checkbox" id="se_conc" ${d.conc ? "checked" : ""}> Concentration</label>
+      <label class="chk"><input type="checkbox" id="se_ritual" ${d.ritual ? "checked" : ""}> Ritual</label>
+    </div>
+    <datalist id="se_times"><option>Action</option><option>Bonus Action</option><option>Reaction</option><option>1 minute</option><option>10 minutes</option><option>1 hour</option></datalist>
+    <p class="small muted" style="margin:10px 0 4px">On the spell lists of:</p>
+    <div class="row small" style="gap:4px 12px">${lists.map(x => `<label><input type="checkbox" class="se_cls" value="${x}" ${d.classes.includes(x) ? "checked" : ""}> ${esc(CLASSES[x].name)}</label>`).join("")}</div>
+    <label style="display:block;margin-top:10px">Description <span class="small muted">(dice like 8d6 become rollable)</span><textarea id="se_text" style="min-height:160px">${esc(d.text || "")}</textarea></label>
+    <div class="foot">${d.id ? `<button class="ghost" data-act="seDel">🗑 Delete</button>` : ""}<button class="ghost" data-act="modalClose">Cancel</button><button data-act="seSave">Save spell</button></div>`;
+}
+function readSpellForm() {
+  const d = S.modal.d, v = id => document.getElementById(id);
+  Object.assign(d, { name: v("se_name").value.trim(), level: +v("se_level").value, school: v("se_school").value, time: v("se_time").value.trim(), range: v("se_range").value.trim(),
+    comp: v("se_comp").value.trim(), dur: v("se_dur").value.trim(), conc: v("se_conc").checked, ritual: v("se_ritual").checked, classes: [...document.querySelectorAll(".se_cls:checked")].map(x => x.value), text: v("se_text").value });
+  return d;
+}
+const SPELL_ACT = {   // merged into ACT in sheet.js
+  spNew: () => spellEditOpen(null),
+  spCopy: (el, e) => { e.stopPropagation(); const s = spellInfo(el.dataset.n); if (s) spellEditOpen(s, true); },
+  spEdit: (el, e) => { e.stopPropagation(); const s = (S.customSpells || []).find(x => norm(x.name) === norm(el.dataset.n)); if (s) spellEditOpen(s); },
+  seSave: async () => {
+    const d = readSpellForm(); if (!d.name) return toast("Give the spell a name");
+    S.customSpells ||= [];
+    const clash = S.customSpells.find(x => norm(x.name) === norm(d.name) && x.id !== d.id);
+    const wiki = Object.values(S.wiki.spells || {}).some(x => norm(x.name || "") === norm(d.name));
+    if (clash || (wiki && norm(S.modal.orig) !== norm(d.name))) return toast("A spell with that name already exists — pick another name");
+    if (d.id) { const i = S.customSpells.findIndex(x => x.id === d.id); S.customSpells[i] = { ...d };
+      if (S.modal.orig && norm(S.modal.orig) !== norm(d.name) && S.char) S.char.spells.forEach(s => { if (norm(s.name) === norm(S.modal.orig)) s.name = d.name; }); }
+    else S.customSpells.push({ ...d, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5) });
+    await saveCustomSpells(); closeModal(); if (S.char) save(); render(); toast("Spell saved");
+  },
+  seDel: async () => { const d = S.modal.d; if (!confirm(`Delete your spell "${d.name}"? Characters who chose it keep a copy.`)) return;
+    S.customSpells = (S.customSpells || []).filter(x => x.id !== d.id); await saveCustomSpells(); closeModal(); render(); }
+};
 
 // ---------- extra features from other classes (house rules, boons, multiclass dips …) ----------
 // a few options that live inside another feature's text but are often taken on their own

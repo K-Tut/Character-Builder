@@ -53,6 +53,7 @@ function buildIndex() {
     if (!s.name) s.name = fromSlug(slug);
     idx.spell[norm(s.name)] = s; idx.spellList.push(s);
   }
+  for (const s of S.customSpells || []) { const o = { ...s, custom: true }; const k = norm(o.name); if (idx.spell[k]) idx.spellList = idx.spellList.filter(x => norm(x.name) !== k); idx.spell[k] = o; idx.spellList.push(o); }
   idx.spellList.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   S.idx = idx; idx.feats = null;
 }
@@ -85,7 +86,7 @@ function lookup(name, slugs = [], fb = "") {
 }
 // used when no rules text is loaded: tells cantrips from levelled spells for species magic
 const KNOWN_CANTRIPS = new Set(["acid splash", "blade ward", "booming blade", "chill touch", "control flames", "create bonfire", "dancing lights", "druidcraft", "eldritch blast", "elementalism", "fire bolt", "friends", "frostbite", "green flame blade", "guidance", "gust", "infestation", "light", "lightning lure", "mage hand", "magic stone", "mending", "message", "mind sliver", "minor illusion", "mold earth", "poison spray", "prestidigitation", "primal savagery", "produce flame", "ray of frost", "resistance", "sacred flame", "shape water", "shillelagh", "shocking grasp", "sorcerous burst", "spare the dying", "starry wisp", "sword burst", "thaumaturgy", "thorn whip", "thunderclap", "toll the dead", "true strike", "vicious mockery", "word of radiance"]);
-function spellInfo(name) { return S.idx.spell[norm(name)] || null; }
+function spellInfo(name) { return S.idx.spell[norm(name)] || (S.char?.homebrewSpells || {})[norm(name)] || null; }
 function classSlug(cls) { return S.wiki.pages[cls + ":main"] ? cls + ":main" : findPage(cls, CLASSES[cls].name); }
 function subclassSlug(cls, sub) { const sc = CLASSES[cls].subclasses[sub]; if (!sc) return null;
   if (sc.legacy) return S.wiki.pages[sc.slug] ? sc.slug : null;

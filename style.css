@@ -492,3 +492,11 @@ body.hasenergy main { padding-left: 46px; }
 .ciimg { width: 96px; height: 96px; border: 1px dashed var(--line); border-radius: 10px; display: grid; place-items: center; text-align: center; cursor: pointer; overflow: hidden; flex: none; font-size: 26px; }
 .ciimg small { font-size: 11px; color: var(--muted); }
 .ciimg img { width: 100%; height: 100%; object-fit: cover; }
+
+/* own spells */
+.spform { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; }
+.spform input:not([type=checkbox]), .spform select { width: 100%; min-width: 0; }
+.spform label { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.spform label.full { grid-column: 1 / -1; }
+.spform label.chk { flex-direction: row; align-items: center; gap: 6px; }
+.tag.own { background: var(--accent-soft); color: var(--accent); }
