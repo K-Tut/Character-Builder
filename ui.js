@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-16d";
+const APP_VERSION = "2026-11-16e";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -634,7 +634,7 @@ function bEquipment(c, D) {
   ${startEquipCard(c, D)}
   <div class="card"><h3>Equipment & items</h3>
     <table class="t"><tr><th>Item</th><th class="num">Qty</th><th>Notes</th><th></th></tr>
-    ${c.items.map((it, i) => `<tr><td>${inp(`items.${i}.name`, it.name, { style: "width:100%" })}</td><td class="num">${inp(`items.${i}.qty`, +it.qty || 1, { type: "number", style: "width:60px" })}</td><td>${inp(`items.${i}.note`, it.note || "", { style: "width:100%" })}</td><td><button class="small ghost" data-act="del" data-p="items" data-i="${i}">✕</button></td></tr>`).join("")}</table>
+    ${c.items.map((it, i) => `<tr><td>${inp(`items.${i}.name`, it.name, { style: "width:100%" })}</td><td class="num">${inp(`items.${i}.qty`, +it.qty || 1, { type: "number", style: "width:60px" })}</td><td>${inp(`items.${i}.note`, it.note || "", { style: "width:100%" })}</td><td style="white-space:nowrap">${it.desc || it.img ? `<button class="small ghost" data-act="itemInfo" data-i="${i}" title="Description">${it.img ? `<img src="${it.img}" style="width:22px;height:22px;object-fit:cover;border-radius:4px;vertical-align:middle">` : "ⓘ"}</button>` : ""}<button class="small ghost" data-act="del" data-p="items" data-i="${i}">✕</button></td></tr>`).join("")}</table>
     <div class="row" style="margin-top:8px"><button data-act="shopOpen">🛒 Shop</button><button class="small ghost" data-act="addItem">+ Add item by hand</button></div>
   </div>`;
 }

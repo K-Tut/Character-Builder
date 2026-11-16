@@ -479,3 +479,16 @@ body.hasenergy main { padding-left: 46px; }
 .xfpick { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .xfpick .muted { margin-left: 4px; }
 .xfdesc { flex-basis: 100%; padding: 4px 4px 6px 30px; font-size: 13px; }
+
+/* options listed under a resource (Channel Divinity → Divine Sense …) */
+.reskid { display: flex; align-items: center; gap: 6px; padding: 4px 0 4px 18px; cursor: pointer; font-size: 13px; border-bottom: 1px dashed var(--line); }
+.reskid:hover b { color: var(--accent); }
+.reskid .kidarrow { color: var(--muted); }
+
+/* own items in the shop */
+.shopthumb { width: 28px; height: 28px; object-fit: cover; border-radius: 5px; flex: none; }
+.shopbig { float: right; max-width: 120px; max-height: 120px; border-radius: 8px; margin: 0 0 6px 10px; }
+.ciform { padding: 4px 2px; }
+.ciimg { width: 96px; height: 96px; border: 1px dashed var(--line); border-radius: 10px; display: grid; place-items: center; text-align: center; cursor: pointer; overflow: hidden; flex: none; font-size: 26px; }
+.ciimg small { font-size: 11px; color: var(--muted); }
+.ciimg img { width: 100%; height: 100%; object-fit: cover; }

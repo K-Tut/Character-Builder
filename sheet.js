@@ -55,6 +55,27 @@ function applyDeathSave(r) {
   if (P.ds.f >= 3) msg += " Three failures — your character dies.";
   save(); render(); toast(msg);
 }
+// ---------- options that spend a resource (shown indented under it in Resources) ----------
+const RES_BASE_OPTS = { channel: { paladin: ["Divine Sense"], cleric: ["Divine Spark", "Turn Undead"] }, focus: { monk: ["Flurry of Blows", "Patient Defense", "Step of the Wind"] } };
+const SPENDS = { channel: ["Abjure Foes", "Sacred Weapon", "Nature's Wrath", "Inspiring Smite", "Peerless Athlete", "Vow of Enmity", "Preserve Life", "Radiance of the Dawn", "Invoke Duplicity", "Guided Strike",
+  "War God's Blessing", "Elemental Smite", "Beacon of Light", "Runic Power", "Holy Bolt", "Luminous Barrier", "Shadowform", "Mind Magic", "Modify Magic", "Divine Sense", "Divine Spark", "Turn Undead"],
+  focus: ["Flurry of Blows", "Patient Defense", "Step of the Wind", "Stunning Strike", "Drunken Technique"] };
+const SPEND_RX = { channel: /\b(expend|use|spend)s? (a|one) (use of (your )?)?channel divinity/i, focus: /\bspend(ing)? (\d+|a|one) focus points?/i, wildshape: /\b(expend|use) (a|one) (use of (your )?)?wild shape/i,
+  bardic: /\b(expend|use) (a|one) (use of (your )?)?bardic inspiration/i, sorcery: /\bspend(ing)? (\d+|a|one) sorcery points?/i, superiority: /\b(expend|spend) (a|one) superiority die/i };
+function resChildren(r, D, feats) {
+  const out = [], seen = new Set(), add = (name, text, src) => { if (seen.has(norm(name)) || norm(name) === norm(r.feature || "")) return; seen.add(norm(name)); out.push({ name, text, src }); };
+  for (const [cls, names] of Object.entries(RES_BASE_OPTS[r.key] || {})) if (D.cls[cls] || (S.char.extraFeats || []).some(k => k.startsWith(cls + "|"))) names.forEach(n => {
+    const f = feats.find(x => norm(x.name) === norm(n)); if (f || D.cls[cls]) add(n, f?.text || lookup(n, [classSlug(cls)].filter(Boolean), CLASS_OPT_DESC[n] || ""), f?.src || CLASSES[cls].name); });
+  feats.forEach(f => { if (f.res && f.res !== r) return;
+    if ((SPENDS[r.key] || []).some(n => norm(n) === norm(f.base || f.name)) || (SPEND_RX[r.key] && SPEND_RX[r.key].test(f.text || ""))) add(f.base || f.name, f.text, f.src); });
+  return out;
+}
+// the resource's own text without the paragraphs of the options listed under it
+function stripOptions(txt, kids) {
+  if (!kids.length) return txt;
+  const names = kids.map(k => k.name.toLowerCase());
+  return String(txt || "").split("\n").filter(l => { const t = l.trim().toLowerCase(); return !names.some(n => t.startsWith(n + ".") || t.startsWith(n + ":") || t.startsWith(n + " (")); }).join("\n");
+}
 function isBloodied(c, D) { const hp = c.play?.hp ?? D.hpMax; return hp > 0 && hp <= Math.floor(D.hpMax / 2); }
 // reasons the character has Advantage on attack rolls right now
 function advantageHints(c, D) {
@@ -165,7 +186,7 @@ function renderSheet() {
       <p class="small muted" style="margin:6px 0 0">🎲 Tap the hit bonus to attack — on a hit tap “Hit” to roll damage (with smites, Hex …).</p>` : '<p class="muted small">Add weapons in Build → Equipment, or ＋ a spell attack.</p>'}
     ${D.cls.rogue ? `<p class="small">Sneak Attack: <b class="roll" ${RD("Sneak Attack", Math.ceil(D.cls.rogue / 2) + "d6")}>🎲 ${Math.ceil(D.cls.rogue / 2)}d6</b></p>` : ""}${D.cls.barbarian ? `<p class="small">Rage damage: <b>+${at(step({ 1: 2, 9: 3, 16: 4 }), D.cls.barbarian)}</b></p>` : ""}</div>`;
   const featsAll = D.resources.length ? collectFeatures(c, D) : [];
-  if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b class="resname" data-act="resInfo" data-k="${esc(r.key)}" title="Show description">${esc(r.name)} <span class="small muted">ⓘ</span></b>${actTag(resKind(r, featsAll))}${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${r.key === "portent" ? portentDice(r, P) : pips(r.key, r.max, P.used[r.key])}</div>
+  if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b class="resname" data-act="resInfo" data-k="${esc(r.key)}" title="Show description">${esc(r.name)} <span class="small muted">ⓘ</span></b>${actTag(resKind(r, featsAll))}${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${r.key === "portent" ? portentDice(r, P) : pips(r.key, r.max, P.used[r.key])}</div>${resChildren(r, D, featsAll).map(k => `<div class="reskid" data-act="resKid" data-k="${esc(r.key)}" data-n="${esc(k.name)}"><span class="kidarrow">↳</span><b>${esc(k.name)}</b>${actTag(actKind(k.text))}<span class="small muted">ⓘ</span></div>`).join("")}
     ${r.forms ? `<div class="row small formrow">${(P.active || {})[r.key] ? `<span class="chip acc">Active: ${esc(P.active[r.key])}</span><a href="#" data-act="endForm" data-k="${r.key}">end</a>` : `<span class="muted">Use as:</span>${r.forms.map(f => `<button class="small ghost" data-act="useForm" data-k="${r.key}" data-f="${esc(f)}">${esc(f)}</button>`).join("")}`}</div>` : ""}`).join("")}</div>`;
   if (D.slots.length || D.pact) c2 += `<div class="card"><h3>Spell slots</h3>${slotRows(D, P)}</div>`;
   c2 += `<div class="card"><h3>Conditions</h3><div>${CONDITIONS.map(x => `<span class="chip ${P.conditions.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="cond" data-v="${x}">${x}</span>`).join("")}</div>
@@ -482,7 +503,7 @@ const ACT = {
         const ex = await DB.getChar(c.id);
         if (ex && (ex._updated || 0) > (c._updated || 0) && !confirm(`The ${c.name} on this device is newer than the file. Replace it with the file anyway?`)) continue;
         if (ex) { c._driveId = ex._driveId; c._syncedAt = ex._syncedAt; }
-        migrate(c); await storeSaveChar(c); n++; last = c;
+        migrate(c); await storeSaveChar(c); await mergeCustomItems(c); n++; last = c;
         }
       }
       await loadChars();
@@ -524,9 +545,12 @@ const ACT = {
   cropSave: async () => { const m = S.modal, g = cropGeom(m); const crop = { cx: (CROP_V / 2 - g.ox) / g.dw, cy: (CROP_V / 2 - g.oy) / g.dh, z: m.z };
     S.char.thumbCrop = crop; S.char.thumb = await makeThumb(S.char.portrait, crop); S.modal = null; save(); render(); renderModal(); toast("Thumbnail saved"); },
   viewPortrait: () => openModal({ type: "image" }),
+  resKid: el => { const D = derive(S.char), r = D.resources.find(x => x.key === el.dataset.k); if (!r) return;
+    const k = resChildren(r, D, D.features).find(x => x.name === el.dataset.n); if (!k) return;
+    openModal({ type: "info", title: k.name, sub: [k.src, "uses " + r.name].filter(Boolean).join(" · "), html: k.text ? diceLinks(para(k.text), k.name) : '<span class="muted">No description imported.</span>' }); },
   resInfo: el => { const D = derive(S.char), r = D.resources.find(x => x.key === el.dataset.k); if (!r) return;
     const f = D.features.find(x => norm(x.name) === norm(r.feature) || norm(x.name).startsWith(norm(r.feature) + " ") || norm(x.name).startsWith(norm(r.feature) + ":"));
-    const txt = f?.text || lookup(r.feature || r.name);
+    const txt = stripOptions(f?.text || lookup(r.feature || r.name), resChildren(r, D, D.features));
     openModal({ type: "info", title: r.name, sub: [f?.src || r.src, r.reset === "SR" ? "recharges on a Short rest" : r.reset === "LR" ? "recharges on a Long rest" : "", r.die ? "die: " + r.die : ""].filter(Boolean).join(" · "), html: txt ? diceLinks(para(txt), r.name) : '<span class="muted">No description imported.</span>' }); },
   mastInfo: el => { const o = S.ui.mastOpen ||= {}; o[el.dataset.i] = !o[el.dataset.i]; render(); },
   spSchool: el => { const v = el.dataset.v, a = S.ui.spSchools || []; S.ui.spSchools = !v ? [] : a.includes(v) ? a.filter(x => x !== v) : [...a, v]; render(); },
@@ -730,6 +754,7 @@ $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && 
   let t = "dark"; try { t = localStorage.getItem("theme") || "dark"; } catch (e) { }   // dark is the default
   applyTheme(t);
   S.settings = (await DB.get("settings")) || {};
+  S.customItems = (await DB.get("customItems")) || [];
   const w = await DB.get("wiki"); if (w) { S.wiki = w; } buildIndex();
   S.server = await detectServer();
   if (S.server) {
