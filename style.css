@@ -468,3 +468,14 @@ body.hasenergy main { padding-left: 46px; }
 }
 [data-theme="scifi"] .herorow button { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 @media print { #energybar { display: none !important; } }
+
+/* extra features tab */
+.xfcls summary, .xfsub summary { cursor: pointer; padding: 2px 0; }
+.xfcls[open] > summary { margin-bottom: 8px; }
+.xfsub { border-top: 1px solid var(--line); padding: 6px 0 6px 10px; }
+.xflist { display: grid; gap: 2px; }
+.xfrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; }
+.xfrow.on { background: var(--accent-soft); }
+.xfpick { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.xfpick .muted { margin-left: 4px; }
+.xfdesc { flex-basis: 100%; padding: 4px 4px 6px 30px; font-size: 13px; }

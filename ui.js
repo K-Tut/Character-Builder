@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-16b";
+const APP_VERSION = "2026-11-16c";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -206,10 +206,10 @@ async function pollImport() {
 }
 
 // ---------- BUILDER ----------
-const TABS = [["basics", "1 · Basics"], ["species", "2 · Species"], ["background", "3 · Background"], ["abilities", "4 · Abilities"], ["levels", "5 · Class & Levels"], ["spells", "6 · Spells"], ["equipment", "7 · Equipment"], ["story", "8 · Story & Notes"]];
+const TABS = [["basics", "1 · Basics"], ["species", "2 · Species"], ["background", "3 · Background"], ["abilities", "4 · Abilities"], ["levels", "5 · Class & Levels"], ["spells", "6 · Spells"], ["equipment", "7 · Equipment"], ["extra", "8 · Extra features"], ["story", "9 · Story & Notes"]];
 function renderBuilder() {
   const c = S.char, D = derive(c);
-  const body = { basics: bBasics, species: bSpecies, background: bBackground, abilities: bAbilities, levels: bLevels, spells: bSpells, equipment: bEquipment, story: bStory }[S.tab](c, D);
+  const body = { basics: bBasics, species: bSpecies, background: bBackground, abilities: bAbilities, levels: bLevels, spells: bSpells, equipment: bEquipment, extra: bExtra, story: bStory }[S.tab](c, D);
   const i = TABS.findIndex(t => t[0] === S.tab);
   return `<div class="card"><div class="row"><div class="grow"><h2 style="margin:0">${esc(c.name)}</h2><div class="muted">${esc(D.summary)}</div></div>
     <button class="ghost" data-act="levelup">⬆ Level up</button><button data-act="view" data-v="sheet">Open play sheet ▶</button></div></div>
@@ -543,6 +543,58 @@ function spellList(c, D, cur, cs) {
     <div class="spell"><div class="h"><input type="checkbox" data-act="spellToggle" data-n="${esc(s.name)}" data-l="${s.level}" data-c="${cur}" ${chosen.has(s.name) ? "checked" : ""}>
     <b data-act="toggleOpen" style="flex:1">${esc(s.name)}</b><span class="tag">${esc(s.school)}</span>${s.conc ? '<span class="tag">C</span>' : ""}${s.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.time)}</span></div>
     <div class="body hidden"><div class="meta">${esc([s.time && "Casting time: " + s.time, s.range && "Range: " + s.range, s.comp && "Components: " + s.comp, s.dur && "Duration: " + s.dur].filter(Boolean).join(" · "))}</div><div class="desc">${para(s.text)}</div></div></div>`).join("")).join("");
+}
+
+// ---------- extra features from other classes (house rules, boons, multiclass dips …) ----------
+// a few options that live inside another feature's text but are often taken on their own
+const CLASS_OPTIONS = { paladin: ["Divine Sense"], cleric: ["Divine Spark", "Turn Undead"], monk: ["Flurry of Blows", "Patient Defense", "Step of the Wind"], druid: ["Wild Companion"], warlock: ["Pact of the Blade", "Pact of the Chain", "Pact of the Tome"] };
+// short summaries for those options (the wiki has them inside another feature, not as their own heading)
+const CLASS_OPT_DESC = {
+  "Divine Sense": "Bonus Action, expend a Channel Divinity: for 10 minutes (or until Incapacitated) you sense the location of any Celestial, Fiend or Undead within 60 ft that isn't behind total cover, and know its creature type. You also sense consecrated or desecrated places and objects in that range.",
+  "Divine Spark": "Magic action, expend a Channel Divinity: point your Holy Symbol at a creature within 30 ft and roll 1d8 + Wis (2d8 at Cleric 7, 3d8 at 13, 4d8 at 18). Either it regains that many HP, or it makes a Con save and takes that much Necrotic or Radiant damage (half on a success).",
+  "Turn Undead": "Magic action, expend a Channel Divinity: each Undead of your choice within 30 ft makes a Wis save. On a failure it is Frightened and Incapacitated for 1 minute, and tries to move away from you; it ends early if it takes damage or you're Incapacitated or die.",
+  "Flurry of Blows": "Spend 1 Focus Point to make two Unarmed Strikes as a Bonus Action.",
+  "Patient Defense": "Take the Disengage action as a Bonus Action; or spend 1 Focus Point to take both Disengage and Dodge as a Bonus Action.",
+  "Step of the Wind": "Take the Dash action as a Bonus Action; or spend 1 Focus Point to take both Disengage and Dash as a Bonus Action, and your jump distance is doubled for the turn.",
+  "Wild Companion": "Magic action: expend a spell slot or a use of Wild Shape to cast Find Familiar without Material components. The familiar is Fey and disappears when you finish a Long Rest.",
+  "Pact of the Blade": "Bonus Action: conjure a pact weapon or bond with a magic weapon you touch. You're proficient with it, can use Charisma for its attack and damage rolls, and can make it deal Necrotic, Psychic or Radiant damage.",
+  "Pact of the Chain": "You learn Find Familiar and can cast it as a Magic action without a slot; your familiar can take special forms (imp, pseudodragon, quasit, sprite, skeleton …) and can make an attack with its Reaction when you take the Attack action.",
+  "Pact of the Tome": "A Book of Shadows appears: it holds three cantrips and two level 1 ritual spells (from any class) that you always have prepared, and it can be your Spellcasting Focus."
+};
+function xfKey(cls, sub, name) { return [cls, sub || "", name].join("|"); }
+function xfText(cls, sub, name) {
+  return sub ? lookup(name, [subclassSlug(cls, sub), classSlug(cls)].filter(Boolean), subDesc(cls, sub, name)) : lookup(name, [classSlug(cls)].filter(Boolean), CLASS_OPT_DESC[name] || "");
+}
+function xfRow(c, cls, sub, name, lvl) {
+  const k = xfKey(cls, sub, name), on = (c.extraFeats || []).includes(k), open = (S.ui.xfDesc || []).includes(k);
+  const txt = open ? xfText(cls, sub, name) : "";
+  return `<div class="xfrow ${on ? "on" : ""}"><label class="xfpick"><input type="checkbox" data-act="xfToggle" data-k="${esc(k)}" ${on ? "checked" : ""}><b>${esc(name)}</b>${lvl ? `<span class="small muted">level ${lvl}</span>` : ""}</label>
+    <a href="#" class="small" data-act="xfDesc" data-k="${esc(k)}">${open ? "▾ hide" : "▸ read"}</a>${open ? `<div class="desc xfdesc">${para(txt) || '<span class="muted small">No description imported.</span>'}</div>` : ""}</div>`;
+}
+function featLevels(features) {
+  const out = []; for (const lv of Object.keys(features).map(Number).sort((a, b) => a - b)) for (const n of features[lv]) if (!n.startsWith("@")) out.push([n, lv]);
+  return out;
+}
+function bExtra(c, D) {
+  const mine = c.extraFeats || [], open = S.ui.xfOpen || [];
+  const nameOf = k => { const [cls, sub, n] = k.split("|"); return `${n} <span class="muted">(${esc(sub ? CLASSES[cls]?.subclasses[sub]?.name || sub : CLASSES[cls]?.name || cls)})</span>`; };
+  let h = `<div class="card"><h3>Extra features</h3><p class="small muted">Take features from any class or subclass — for example Divine Sense from the Paladin, a boon your DM gave you, or a house rule. Ticked features appear on your play sheet under Features; tap ✎ there to give them uses per rest.</p>
+    ${mine.length ? `<div>${mine.map(k => `<span class="chip acc">${nameOf(k)} <a href="#" data-act="xfRemove" data-k="${esc(k)}">✕</a></span>`).join("")}</div>` : `<p class="muted small">Nothing added yet.</p>`}</div>`;
+  for (const [cls, C] of Object.entries(CLASSES)) {
+    const n = mine.filter(k => k.startsWith(cls + "|")).length, isOpen = open.includes(cls);
+    h += `<details class="card xfcls" ${isOpen ? "open" : ""}><summary data-act="xfOpen" data-k="${cls}"><b>${esc(C.name)}</b>${n ? ` <span class="chip acc">${n} added</span>` : ""}</summary>`;
+    if (isOpen) {
+      h += `<div class="xflist">${featLevels(C.features).map(([f, lv]) => xfRow(c, cls, "", f, lv)).join("")}${(CLASS_OPTIONS[cls] || []).map(f => xfRow(c, cls, "", f, 0)).join("")}</div>`;
+      const subs = Object.entries(C.subclasses).sort((a, b) => (a[1].legacy ? 1 : 0) - (b[1].legacy ? 1 : 0) || a[1].name.localeCompare(b[1].name));
+      h += `<p class="small muted" style="margin:10px 0 4px">Subclasses</p>` + subs.map(([sk, s]) => {
+        const key = cls + ":" + sk, so = open.includes(key), sn = mine.filter(k => k.startsWith(cls + "|" + sk + "|")).length;
+        return `<details class="xfsub" ${so ? "open" : ""}><summary data-act="xfOpen" data-k="${key}"><b>${esc(s.name)}</b>${s.legacy ? ` <span class="small muted">${esc(s.src || "2014")}</span>` : s.src ? ` <span class="small muted">${esc(s.src)}</span>` : ""}${sn ? ` <span class="chip acc">${sn}</span>` : ""}</summary>
+          ${so ? `<div class="xflist">${featLevels(s.features).map(([f, lv]) => xfRow(c, cls, sk, f, lv)).join("")}</div>` : ""}</details>`;
+      }).join("");
+    }
+    h += `</details>`;
+  }
+  return h;
 }
 
 // ---------- equipment ----------

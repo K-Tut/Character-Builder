@@ -550,6 +550,9 @@ function collectFeatures(c, D) {
       add("pool:" + pk + ":" + o + ":" + i, o + (extra ? " → " + extra : ""), POOLS[pk].label, text, { cat: "option", base: o });
     });
   }
+  // features taken from other classes (Build → Extra features)
+  (c.extraFeats || []).forEach(k => { const [cls, sub, name] = k.split("|"); const C = CLASSES[cls]; if (!C) return;
+    add("extra:" + k, name, "Extra · " + (sub ? C.subclasses[sub]?.name || sub : C.name), xfText(cls, sub, name), { cat: "extra" }); });
   // custom
   (c.custom || []).forEach((cf, i) => add("custom:" + i, cf.name || "Custom feature", "Custom", cf.text, { cat: "custom", customIdx: i }));
   return F;

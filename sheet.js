@@ -504,6 +504,9 @@ const ACT = {
   deleteChar: async () => { if (!confirm("Delete " + S.char.name + " on all devices?")) return; await storeDeleteChar(S.char.id); S.char = null; S.view = "home"; await loadChars(); render(); },
   setSpecies: el => { const c = S.char; if (c.species.id !== el.dataset.id) { c.species = { id: el.dataset.id, choice: "", size: "" }; delete c.pools.keenSenses; delete c.pools.skillful; delete c.pools.spSkills; } save(); render(); },
   toggleOldSpecies: () => { S.ui.oldSpecies = !S.ui.oldSpecies; render(); },
+  xfOpen: (el, e) => { e.preventDefault(); const k = el.dataset.k, a = S.ui.xfOpen ||= []; const i = a.indexOf(k); i >= 0 ? a.splice(i, 1) : a.push(k); render(); },
+  xfDesc: (el, e) => { e.preventDefault(); const k = el.dataset.k, a = S.ui.xfDesc ||= []; const i = a.indexOf(k); i >= 0 ? a.splice(i, 1) : a.push(k); render(); },
+  xfRemove: (el, e) => { e.preventDefault(); S.char.extraFeats = (S.char.extraFeats || []).filter(k => k !== el.dataset.k); save(); render(); },
   toggleOldSubs: (el, e) => { e.preventDefault(); S.ui.oldSubs = !S.ui.oldSubs; renderModal(); },
   useForm: el => { const c = S.char, r = derive(c).resources.find(x => x.key === el.dataset.k); if (!r) return; const used = c.play.used[r.key] || 0;
     if (used >= r.max) return toast("No uses left — finish a Long Rest"); c.play.used[r.key] = used + 1; (c.play.active ||= {})[r.key] = el.dataset.f; save(); render(); toast(el.dataset.f + " — active for 1 minute"); },
@@ -663,6 +666,7 @@ const ACT = {
 };
 // change-type actions (inputs/selects/checkboxes)
 const CHG = {
+  xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },
   grpToggle: el => { const m = S.modal, id = el.dataset.id; m.name = $("#grpname").value; m.ids = el.checked ? [...new Set([...m.ids, id])] : m.ids.filter(x => x !== id); },
   restChoice: el => { S.char.pools[el.dataset.k] = el.value ? [el.value] : []; },
   freeToggle: el => { const n = el.dataset.n, a = S.char.freeCasts ||= []; const i = a.indexOf(n); i >= 0 ? a.splice(i, 1) : a.push(n); },
