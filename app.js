@@ -90,6 +90,11 @@ function classSlug(cls) { return S.wiki.pages[cls + ":main"] ? cls + ":main" : f
 function subclassSlug(cls, sub) { const sc = CLASSES[cls].subclasses[sub]; if (!sc) return null;
   if (sc.legacy) return S.wiki.pages[sc.slug] ? sc.slug : null;
   return findPage(cls, sc.name, p => p.slug.endsWith(":main") || isLegacyPage(p), true); }
+// Build → Extra features: keys are "cls|sub|feature" or "sp:<species id>||trait"
+function xfParse(k) { const [a, sub, name] = String(k).split("|"); return a.startsWith("sp:") ? { sp: a.slice(3), name } : { cls: a, sub, name }; }
+function xfSource(x) { return x.sp ? SPECIES[x.sp] : x.sub ? CLASSES[x.cls]?.subclasses[x.sub] : CLASSES[x.cls]; }
+// options that need another feature's resource to be usable
+const XF_RES = { "Divine Sense": ["paladin", "channel"], "Divine Spark": ["cleric", "channel"], "Turn Undead": ["cleric", "channel"], "Flurry of Blows": ["monk", "focus"], "Patient Defense": ["monk", "focus"], "Step of the Wind": ["monk", "focus"], "Wild Companion": ["druid", "wildshape"] };
 function subChoice(c, ch) { const v = (c.pools?.[ch.key] || [])[0]; return ch.options.includes(v) ? v : ""; }
 function speciesSlug(sp) { if (!sp) return null; if (sp.legacy) return S.wiki.pages[sp.slug] ? sp.slug : null; return findPage("species", sp.name, isLegacyPage); }
 
@@ -331,6 +336,7 @@ function derive(c) {
   if (c.play.exhaustion) speed = Math.max(0, speed - 5 * c.play.exhaustion);
   D.speed = speed;
   D.darkvision = spc.darkvision || sp?.darkvision || 0;
+  (c.extraFeats || []).map(xfParse).forEach(x => { if (x.sp && /darkvision/i.test(x.name)) D.darkvision = Math.max(D.darkvision, SPECIES[x.sp]?.darkvision || 60); });
   D.size = c.species.size || (sp ? sp.size.split(" or ")[0] : "Medium");
   D.resist = [...(sp?.resist || []), ...(spc.resist || [])];
   if (sp?.resistFromChoice && c.species.choice) { const m = c.species.choice.match(/\((.*)\)/); if (m) D.resist.push(m[1]); }
@@ -380,6 +386,9 @@ function derive(c) {
     }
     for (const lv in sub.freeCasts || {}) if (D.cls[k] >= +lv) sub.freeCasts[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: k, src: sub.name }));
   }
+  // always-prepared spells of an extra "… Spells" feature, by character level
+  (c.extraFeats || []).map(xfParse).forEach(x => { const src = xfSource(x); if (!x.sub || !src?.spells || !/spells$/i.test(x.name)) return;
+    for (const lv in src.spells) if (D.level >= +lv) src.spells[lv].forEach(n => { if (!D.alwaysSpells.some(s => s.name === n)) D.alwaysSpells.push({ name: n, cls: x.cls, src: src.name }); }); });
   const spSpells = { ...(sp?.spells || {}) }; for (const lv in spc.spells || {}) spSpells[lv] = [...(spSpells[lv] || []), ...spc.spells[lv]];
   for (const lv in spSpells) if (D.level >= +lv || (D.level === 0 && +lv === 1)) spSpells[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: "species", src: sp.name + (c.species.choice ? " (" + c.species.choice + ")" : "") }));
 
@@ -394,6 +403,13 @@ function derive(c) {
     (D.subs[k]?.resources || []).forEach(r => pushRes(r, D.cls[k], D.subs[k].name));
   }
   (sp?.resources || []).forEach(r => pushRes(r, D.level, sp.name));
+  // resources of features taken in Build → Extra features (counted with your character level)
+  (c.extraFeats || []).map(xfParse).forEach(x => {
+    const src = xfSource(x); if (!src) return;
+    const list = (src.resources || []).filter(r => r.feature && norm(r.feature) === norm(x.name));
+    const need = XF_RES[x.name]; if (need) list.push(...(CLASSES[need[0]].resources || []).filter(r => r.key === need[1]));
+    list.forEach(r => { if (!D.resources.some(y => y.key === r.key)) pushRes(r, D.level, "Extra · " + (src.name || "")); });
+  });
   D.feats.forEach(f => { const fd = FEATS[f.name]; if (fd?.res) pushRes({ key: "feat_" + norm(f.name), feature: f.name, ...fd.res }, D.level, f.name); });
   if (sp && c.species.id === "human") D.resources.push({ key: "heroic", name: "Heroic Inspiration (Resourceful)", max: 1, reset: "LR", feature: "Resourceful", src: "Human" });
   const replaced = new Set(Object.entries(D.subs).filter(([k]) => D.cls[k] >= 3).flatMap(([, s]) => s.replaces || []));
@@ -551,8 +567,8 @@ function collectFeatures(c, D) {
     });
   }
   // features taken from other classes (Build → Extra features)
-  (c.extraFeats || []).forEach(k => { const [cls, sub, name] = k.split("|"); const C = CLASSES[cls]; if (!C) return;
-    add("extra:" + k, name, "Extra · " + (sub ? C.subclasses[sub]?.name || sub : C.name), xfText(cls, sub, name), { cat: "extra" }); });
+  (c.extraFeats || []).forEach(k => { const x = xfParse(k), src = xfSource(x); if (!src) return;
+    add("extra:" + k, x.name, "Extra · " + src.name, x.sp ? xfSpText(x.sp, x.name) : xfText(x.cls, x.sub, x.name), { cat: "extra", base: x.name }); });
   // custom
   (c.custom || []).forEach((cf, i) => add("custom:" + i, cf.name || "Custom feature", "Custom", cf.text, { cat: "custom", customIdx: i }));
   return F;

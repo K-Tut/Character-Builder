@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-16c";
+const APP_VERSION = "2026-11-16d";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -561,6 +561,12 @@ const CLASS_OPT_DESC = {
   "Pact of the Chain": "You learn Find Familiar and can cast it as a Magic action without a slot; your familiar can take special forms (imp, pseudodragon, quasit, sprite, skeleton …) and can make an attack with its Reaction when you take the Attack action.",
   "Pact of the Tome": "A Book of Shadows appears: it holds three cantrips and two level 1 ritual spells (from any class) that you always have prepared, and it can be your Spellcasting Focus."
 };
+function xfSpText(id, name) { const s = SPECIES[id]; return lookup(name, [speciesSlug(s)].filter(Boolean)); }
+function xfSpRow(c, id, name, lvl) {
+  const k = "sp:" + id + "||" + name, on = (c.extraFeats || []).includes(k), open = (S.ui.xfDesc || []).includes(k);
+  return `<div class="xfrow ${on ? "on" : ""}"><label class="xfpick"><input type="checkbox" data-act="xfToggle" data-k="${esc(k)}" ${on ? "checked" : ""}><b>${esc(name)}</b>${lvl > 1 ? `<span class="small muted">level ${lvl}</span>` : ""}</label>
+    <a href="#" class="small" data-act="xfDesc" data-k="${esc(k)}">${open ? "▾ hide" : "▸ read"}</a>${open ? `<div class="desc xfdesc">${para(xfSpText(id, name)) || '<span class="muted small">No description imported.</span>'}</div>` : ""}</div>`;
+}
 function xfKey(cls, sub, name) { return [cls, sub || "", name].join("|"); }
 function xfText(cls, sub, name) {
   return sub ? lookup(name, [subclassSlug(cls, sub), classSlug(cls)].filter(Boolean), subDesc(cls, sub, name)) : lookup(name, [classSlug(cls)].filter(Boolean), CLASS_OPT_DESC[name] || "");
@@ -577,8 +583,8 @@ function featLevels(features) {
 }
 function bExtra(c, D) {
   const mine = c.extraFeats || [], open = S.ui.xfOpen || [];
-  const nameOf = k => { const [cls, sub, n] = k.split("|"); return `${n} <span class="muted">(${esc(sub ? CLASSES[cls]?.subclasses[sub]?.name || sub : CLASSES[cls]?.name || cls)})</span>`; };
-  let h = `<div class="card"><h3>Extra features</h3><p class="small muted">Take features from any class or subclass — for example Divine Sense from the Paladin, a boon your DM gave you, or a house rule. Ticked features appear on your play sheet under Features; tap ✎ there to give them uses per rest.</p>
+  const nameOf = k => { const x = xfParse(k); return `${esc(x.name)} <span class="muted">(${esc(xfSource(x)?.name || "?")})</span>`; };
+  let h = `<div class="card"><h3>Extra features</h3><p class="small muted">Take features from any class, subclass or species — for example Divine Sense from the Paladin or an Elf's Fey Ancestry. Ticked features appear on your play sheet under Features. If the feature has uses (Rage, Breath Weapon, Channel Divinity …) they appear under Resources, counted with your character level; "… Spells" features add their spells. Otherwise tap ✎ on the feature to give it uses per rest.</p>
     ${mine.length ? `<div>${mine.map(k => `<span class="chip acc">${nameOf(k)} <a href="#" data-act="xfRemove" data-k="${esc(k)}">✕</a></span>`).join("")}</div>` : `<p class="muted small">Nothing added yet.</p>`}</div>`;
   for (const [cls, C] of Object.entries(CLASSES)) {
     const n = mine.filter(k => k.startsWith(cls + "|")).length, isOpen = open.includes(cls);
@@ -594,7 +600,16 @@ function bExtra(c, D) {
     }
     h += `</details>`;
   }
-  return h;
+  // species
+  const spOpen = open.includes("species"), nsp = mine.filter(k => k.startsWith("sp:")).length;
+  h += `<details class="card xfcls" ${spOpen ? "open" : ""}><summary data-act="xfOpen" data-k="species"><b>Species</b>${nsp ? ` <span class="chip acc">${nsp} added</span>` : ""}</summary>`;
+  if (spOpen) h += Object.entries(SPECIES).sort((a, b) => (a[1].legacy ? 1 : 0) - (b[1].legacy ? 1 : 0) || a[1].name.localeCompare(b[1].name)).map(([id, s]) => {
+    const key = "sp:" + id, so = open.includes(key), sn = mine.filter(k => k.startsWith(key + "||")).length;
+    const traits = Object.entries(s.traits || {}).flatMap(([lv, a]) => a.map(t => [t, +lv]));
+    return `<details class="xfsub" ${so ? "open" : ""}><summary data-act="xfOpen" data-k="${key}"><b>${esc(s.name)}</b>${s.legacy && s.src ? ` <span class="small muted">${esc(s.src)}</span>` : ""}${sn ? ` <span class="chip acc">${sn}</span>` : ""}</summary>
+      ${so ? `<div class="xflist">${traits.map(([t, lv]) => xfSpRow(c, id, t, lv)).join("")}</div>` : ""}</details>`;
+  }).join("");
+  return h + `</details>`;
 }
 
 // ---------- equipment ----------
