@@ -434,8 +434,12 @@ a.spl.on { background: var(--accent-soft); }
 [data-theme="scifi"] .charcard img, [data-theme="scifi"] .cgfaces img { box-shadow: 0 0 0 1px rgba(63,208,255,.5); }
 /* hit point bar in the card: segmented energy cell */
 [data-theme="scifi"] .hpbar { height: 14px; border-radius: 0; background: #061220; border: 1px solid #1f5578; padding: 2px; }
-[data-theme="scifi"] .hpbar div { background: linear-gradient(90deg, #1a9fd1, #5fdcff) !important; box-shadow: var(--glow);
-  -webkit-mask: repeating-linear-gradient(90deg, #000 0 9px, transparent 9px 12px); mask: repeating-linear-gradient(90deg, #000 0 9px, transparent 9px 12px); }
+[data-theme="scifi"] .hpbar.segs { display: flex; gap: 2px; height: 16px; }
+[data-theme="scifi"] .hpbar.segs.dense { gap: 1px; }
+[data-theme="scifi"] .hpbar.segs i { flex: 1 1 0; min-width: 0; background: rgba(63,208,255,.07); }
+[data-theme="scifi"] .hpbar.segs i.on { background: linear-gradient(180deg, #6be1ff, #1a9fd1); box-shadow: 0 0 5px rgba(63,208,255,.6); }
+[data-theme="scifi"] .hpbar.segs.low i.on { background: linear-gradient(180deg, #ff4d6a, #b0122e); box-shadow: 0 0 5px rgba(255,60,90,.7); }
+[data-theme="scifi"] .hpbar.segs i.tmp { background: rgba(200,245,255,.85); }
 [data-theme="scifi"] .acttag { border-radius: 1px; }
 /* energy bar on the left edge */
 #energybar { position: fixed; z-index: 15; left: 6px; top: 76px; bottom: 24px; width: 30px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
@@ -444,11 +448,12 @@ a.spl.on { background: var(--accent-soft); }
 #energybar .ebtxt span { display: block; font-size: 9px; color: var(--muted); border-top: 1px solid var(--line); margin-top: 2px; padding-top: 1px; }
 #energybar .ebtxt i { display: block; font-style: normal; font-size: 9px; color: #9be7ff; }
 #energybar .ebtrack { position: relative; flex: 1; width: 16px; background: #061220; border: 1px solid #1f5578; box-shadow: inset 0 0 8px rgba(0,0,0,.6); padding: 2px; }
-#energybar .ebfill, #energybar .ebtemp { position: absolute; left: 2px; right: 2px; transition: height .4s ease, bottom .4s ease;
-  -webkit-mask: repeating-linear-gradient(0deg, #000 0 7px, transparent 7px 10px); mask: repeating-linear-gradient(0deg, #000 0 7px, transparent 7px 10px); }
-#energybar .ebfill { bottom: 2px; background: linear-gradient(0deg, #1a9fd1, #6be1ff); box-shadow: 0 0 10px rgba(63,208,255,.8); }
-#energybar .ebtemp { background: rgba(190,240,255,.85); }
-#energybar.low .ebfill { background: linear-gradient(0deg, #b0122e, #ff4d6a); box-shadow: 0 0 12px rgba(255,60,90,.9); animation: eblow 1.2s ease-in-out infinite; }
+#energybar .ebtrack { display: flex; flex-direction: column-reverse; gap: 2px; }
+#energybar .ebtrack.dense { gap: 1px; }
+#energybar .ebtrack i { flex: 1 1 0; min-height: 0; background: rgba(63,208,255,.07); transition: background .3s; }
+#energybar .ebtrack i.on { background: linear-gradient(90deg, #1a9fd1, #6be1ff); box-shadow: 0 0 6px rgba(63,208,255,.7); }
+#energybar .ebtrack i.tmp { background: rgba(200,245,255,.85); }
+#energybar.low .ebtrack i.on { background: linear-gradient(90deg, #b0122e, #ff4d6a); box-shadow: 0 0 7px rgba(255,60,90,.8); animation: eblow 1.2s ease-in-out infinite; }
 #energybar.low .ebtxt { color: #ff5a74; text-shadow: 0 0 8px rgba(255,60,90,.7); }
 #energybar.zero .ebtrack { border-color: #ff4d6a; animation: eblow .8s steps(2) infinite; }
 @keyframes eblow { 50% { opacity: .55; } }

@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-16a";
+const APP_VERSION = "2026-11-16b";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -130,10 +130,11 @@ function updateEnergyBar() {
   el.classList.toggle("hidden", !on); document.body.classList.toggle("hasenergy", !!on);
   if (!on) return;
   const D = derive(S.char), P = S.char.play, hp = Math.max(0, Math.min(P.hp ?? D.hpMax, D.hpMax)), pct = D.hpMax ? 100 * hp / D.hpMax : 0;
-  const tmp = Math.min(100 - pct, D.hpMax ? 100 * (+P.temp || 0) / D.hpMax : 0);
   el.classList.toggle("low", pct <= 50); el.classList.toggle("zero", hp <= 0);
-  el.querySelector(".ebfill").style.height = pct + "%";
-  const t = el.querySelector(".ebtemp"); t.style.bottom = pct + "%"; t.style.height = tmp + "%";
+  // one segment per hit point (temporary HP light up the empty ones above)
+  const tmp = +P.temp || 0, segs = n => Array.from({ length: D.hpMax }, (_, i) => `<i class="${i < hp ? "on" : i < hp + tmp ? "tmp" : ""}"></i>`).join("");
+  const tr = el.querySelector(".ebtrack"); tr.innerHTML = segs(); tr.classList.toggle("dense", D.hpMax > 120);
+  const bar = document.querySelector(".hpbar"); if (bar) { bar.classList.add("segs"); bar.innerHTML = segs(); bar.classList.toggle("dense", D.hpMax > 80); bar.classList.toggle("low", pct <= 50); }
   el.querySelector(".ebtxt").innerHTML = `<b>${hp}</b><span>${D.hpMax}</span>${P.temp ? `<i>+${P.temp}</i>` : ""}`;
 }
 // shrink a long character name until it fits on one line (not below 14px; then it wraps)
