@@ -500,3 +500,9 @@ body.hasenergy main { padding-left: 46px; }
 .spform label.full { grid-column: 1 / -1; }
 .spform label.chk { flex-direction: row; align-items: center; gap: 6px; }
 .tag.own { background: var(--accent-soft); color: var(--accent); }
+
+/* spell points */
+.sppool { padding: 4px 0; }
+.spnum { font-size: 20px; }
+.spbar { height: 8px; background: var(--chip); border-radius: 4px; overflow: hidden; margin: 6px 0 4px; }
+.spbar div { height: 100%; background: linear-gradient(90deg, #7a3fd1, #c06bff); transition: width .2s; }

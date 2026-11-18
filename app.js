@@ -370,6 +370,13 @@ function derive(c) {
       cantrips: at(cs.cantrips, l) + extraC, prepared: at(cs.prepared, l), dc: 8 + D.pb + D.mod[ab], atk: D.pb + D.mod[ab] });
   }
   D.slots = casterLevel ? SLOTS[Math.min(casterLevel, 20)] : [];
+  // Sorcerer variant: spell points instead of slots, one pool together with Sorcery Points (1 sorcery point = 1 spell point)
+  D.spellPoints = null;
+  if (c.spellPoints && D.cls.sorcerer && casterLevel) {
+    const cl = Math.min(casterLevel, 20), sorc = D.cls.sorcerer >= 2 ? D.cls.sorcerer : 0;
+    D.spellPoints = { base: SPELL_POINTS[cl], sorc, max: SPELL_POINTS[cl] + sorc, maxLvl: SLOTS[cl].length };
+    D.slots = [];
+  }
   if (D.cls.warlock) { const l = D.cls.warlock; D.pact = { n: at(CLASSES.warlock.pact.n, l), lvl: at(CLASSES.warlock.pact.lvl, l) }; }
 
   if (sp && sp.spellAbility) {
@@ -415,6 +422,7 @@ function derive(c) {
   if (sp && c.species.id === "human") D.resources.push({ key: "heroic", name: "Heroic Inspiration (Resourceful)", max: 1, reset: "LR", feature: "Resourceful", src: "Human" });
   const replaced = new Set(Object.entries(D.subs).filter(([k]) => D.cls[k] >= 3).flatMap(([, s]) => s.replaces || []));
   if (replaced.size) D.resources = D.resources.filter(r => !replaced.has(r.feature));
+  if (D.spellPoints) D.resources = D.resources.filter(r => r.key !== "sorcery");   // they live in the spell point pool
   (c.custom || []).forEach((cf, i) => { if (+cf.uses > 0) D.resources.push({ key: "custom" + i, name: cf.name, max: +cf.uses, reset: cf.reset || "LR", feature: cf.name, src: "Custom" }); });
 
   // spells you can cast once per long rest without a slot -> one resource each (shared with the Spells tab)

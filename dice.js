@@ -77,6 +77,7 @@ const Dice = {
       const v = lvlSel || "";
       if (v.startsWith("res:")) { spend = { kind: "res", key: v.slice(4) }; lbl += " (free)"; }
       else if (v === "pact") { const L = r.pactLvl || r.lvl; n += (r.per || 0) * (L - r.lvl); spend = { kind: "pact" }; lbl += ` (pact ${L})`; }
+      else if (v.startsWith("pts:")) { const L = +v.slice(4); n += (r.per || 0) * (L - r.lvl); spend = { kind: "pts", lvl: L }; lbl += ` (lvl ${L}, ${SPELL_POINT_COST[L]} pts)`; }
       else if (v.startsWith("slot:")) { const L = +v.slice(5); n += (r.per || 0) * (L - r.lvl); spend = { kind: "slot", lvl: L }; lbl += ` (lvl ${L})`; }
     }
     if (r.flat) c.extras.push({ flat: r.flat, type: r.type, label: lbl, rider: i });
@@ -98,6 +99,7 @@ const Dice = {
         const o = [];
         if (r.freeKey) { const res = D.resources.find(x => x.key === r.freeKey); if (res) { const left = res.max - (P.used[r.freeKey] || 0); o.push(`<option value="res:${r.freeKey}" ${left > 0 ? "" : "disabled"}>free cast (${left} left)</option>`); } }
         if (!r.pactOnly) D.slots.forEach((nS, j) => { const L = j + 1; if (L < r.lvl) return; const left = nS - (P.slots[L] || 0); o.push(`<option value="slot:${L}" ${left > 0 ? "" : "disabled"}>level ${L} slot (${left} left)</option>`); });
+        if (D.spellPoints) { const left = D.spellPoints.max - (+P.used.spellpoints || 0); for (let L = r.lvl; L <= D.spellPoints.maxLvl; L++) { const cost = SPELL_POINT_COST[L], done = L >= 6 && P.used["splvl" + L]; o.push(`<option value="pts:${L}" ${left >= cost && !done ? "" : "disabled"}>level ${L} — ${cost} spell points (${left} left)</option>`); } }
         if (D.pact && D.pact.lvl >= r.lvl) { const left = D.pact.n - (+P.pact || 0); o.push(`<option value="pact" ${left > 0 ? "" : "disabled"}>pact slot, level ${D.pact.lvl} (${left} left)</option>`); }
         o.push(`<option value="">don't use a slot</option>`);
         const first = o.findIndex(x => !x.includes("disabled"));
@@ -140,7 +142,7 @@ const Dice = {
     const spends = c.extras.filter(e => e.spend);
     if (spends.length && S.char) {
       const P = S.char.play;
-      spends.forEach(e => { const s = e.spend; if (s.kind === "slot") P.slots[s.lvl] = (P.slots[s.lvl] || 0) + 1; else if (s.kind === "pact") P.pact = (+P.pact || 0) + 1; else if (s.kind === "res") P.used[s.key] = (P.used[s.key] || 0) + 1; });
+      spends.forEach(e => { const s = e.spend; if (s.kind === "slot") P.slots[s.lvl] = (P.slots[s.lvl] || 0) + 1; else if (s.kind === "pact") P.pact = (+P.pact || 0) + 1; else if (s.kind === "res") P.used[s.key] = (P.used[s.key] || 0) + 1; else if (s.kind === "pts") { P.used.spellpoints = (+P.used.spellpoints || 0) + SPELL_POINT_COST[s.lvl]; if (s.lvl >= 6) P.used["splvl" + s.lvl] = 1; } });
       save(); render();
     }
     const tag = { adv: "Advantage", dis: "Disadvantage", crit: "Critical" }[mode] || "";

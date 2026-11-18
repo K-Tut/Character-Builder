@@ -97,7 +97,7 @@ function pPowers(c, D, o) {
     const casters = D.casters.map(cs => `${cs.name}: Spell DC <b>${cs.dc}</b> (8+${ABBR[cs.ability]}+Prof) · Spell Attack <b>${sgn(cs.atk)}</b>`)
       .concat(D.speciesCast && D.alwaysSpells.some(s => s.cls === "species") ? [`${esc(D.speciesCast.name)} spells: DC <b>${D.speciesCast.dc}</b> (8+${ABBR[D.speciesCast.ability]}+Prof) · Attack <b>${sgn(D.speciesCast.atk)}</b>`] : []).join(" &nbsp;|&nbsp; ");
     const slots = D.slots.map((n, i) => `L${i + 1}: ${"○".repeat(n)}`).join("&nbsp;&nbsp; ") + (D.pact ? `&nbsp;&nbsp; Pact (L${D.pact.lvl}): ${"○".repeat(D.pact.n)}` : "");
-    spells += `<tr class="psec"><td colspan="3">Spells${casters ? `<div class="pcast">${casters}</div>` : ""}${slots ? `<div class="pcast">Slots — ${slots}</div>` : ""}</td></tr>`;
+    spells += `<tr class="psec"><td colspan="3">Spells${casters ? `<div class="pcast">${casters}</div>` : ""}${slots ? `<div class="pcast">Slots — ${slots}</div>` : ""}${D.spellPoints ? `<div class="pcast">Spell points: <b>${D.spellPoints.max}</b> (incl. ${D.spellPoints.sorc} Sorcery Points) · cost ${SPELL_POINT_COST.slice(1, D.spellPoints.maxLvl + 1).map((x, i) => `L${i + 1} ${x}`).join(", ")} · L6+ once per long rest</div>` : ""}</td></tr>`;
     for (const l of Object.keys(groups).sort((a, b) => (a === "?" ? 99 : a) - (b === "?" ? 99 : b))) {
       spells += `<tr class="psub"><td colspan="3">${l === "?" ? "Other spells" : +l ? "Level " + l + " spells" : "Cantrips <span class='pmuted'>(Spells of lvl 0 which you can cast as an action without using a spellslot)</span>"}</td></tr>`;
       spells += groups[l].sort((a, b) => a.name.localeCompare(b.name)).map(s => {

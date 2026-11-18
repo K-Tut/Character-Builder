@@ -10,7 +10,17 @@ function pips(key, max, used, label) {
 const R = (title, mod) => `data-act="roll" data-k="d20" data-m="${mod}" data-t="${esc(title)}" title="Roll ${esc(title)}"`;
 const RD = (title, f) => `data-act="roll" data-k="dmg" data-f="${esc(f)}" data-t="${esc(title)}" title="Roll ${esc(title)}"`;
 const ATK = (id, k) => `data-act="atkRoll" data-at="${id}" data-k="${k}" title="${k === "hit" ? "Roll to hit" : "Roll damage"}"`;
+function spellPointsBox(D, P) {
+  const SPx = D.spellPoints, used = +P.used.spellpoints || 0, rem = Math.max(0, SPx.max - used);
+  const btns = Array.from({ length: SPx.maxLvl }, (_, i) => i + 1).map(L => { const cost = SPELL_POINT_COST[L], once = L >= 6, done = once && P.used["splvl" + L];
+    return `<button class="small ${rem >= cost && !done ? "" : "ghost"}" data-act="spCast" data-l="${L}" ${rem < cost || done ? "disabled" : ""} title="${once ? "once per long rest" : ""}">L${L} · ${cost}${once ? (done ? " ✓" : " ¹") : ""}</button>`; }).join("");
+  return `<div class="sppool"><div class="row"><b>Spell points</b><span class="small muted">long rest</span><span class="right row" style="gap:4px"><button class="small ghost" data-act="resStep" data-k="spellpoints" data-d="1" title="Spend 1 (Metamagic …)">−</button><b class="spnum">${rem}</b><span class="muted">/ ${SPx.max}</span><button class="small ghost" data-act="resStep" data-k="spellpoints" data-d="-1" title="Give 1 back">+</button></span></div>
+    <div class="spbar"><div style="width:${100 * rem / SPx.max}%"></div></div>
+    <div class="small muted" style="margin:4px 0">Cast at level (cost):</div><div class="row" style="gap:4px">${btns}</div>
+    <div class="small muted" style="margin-top:6px">${SPx.base} spell points + ${SPx.sorc} Sorcery Points in one pool. Metamagic and other Sorcery Point costs: tap −. ¹ Level 6+ only once each per long rest.</div></div>`;
+}
 function slotRows(D, P) {
+  if (D.spellPoints) return spellPointsBox(D, P) + (D.pact ? `<div class="res"><span class="n">Pact slots (level ${D.pact.lvl}) <span class="small muted">short rest</span></span>${pips("pact", D.pact.n, P.pact)}</div>` : "");
   return D.slots.map((n, i) => `<div class="res"><span class="n">Level ${i + 1}</span>${pips("slot_" + (i + 1), n, P.slots[i + 1])}</div>`).join("")
     + (D.pact ? `<div class="res"><span class="n">Pact slots (level ${D.pact.lvl}) <span class="small muted">short rest</span></span>${pips("pact", D.pact.n, P.pact)}</div>` : "");
 }
@@ -188,7 +198,7 @@ function renderSheet() {
   const featsAll = D.resources.length ? collectFeatures(c, D) : [];
   if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b class="resname" data-act="resInfo" data-k="${esc(r.key)}" title="Show description">${esc(r.name)} <span class="small muted">ⓘ</span></b>${actTag(resKind(r, featsAll))}${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${r.key === "portent" ? portentDice(r, P) : pips(r.key, r.max, P.used[r.key])}</div>${resChildren(r, D, featsAll).map(k => `<div class="reskid" data-act="resKid" data-k="${esc(r.key)}" data-n="${esc(k.name)}"><span class="kidarrow">↳</span><b>${esc(k.name)}</b>${actTag(actKind(k.text))}<span class="small muted">ⓘ</span></div>`).join("")}
     ${r.forms ? `<div class="row small formrow">${(P.active || {})[r.key] ? `<span class="chip acc">Active: ${esc(P.active[r.key])}</span><a href="#" data-act="endForm" data-k="${r.key}">end</a>` : `<span class="muted">Use as:</span>${r.forms.map(f => `<button class="small ghost" data-act="useForm" data-k="${r.key}" data-f="${esc(f)}">${esc(f)}</button>`).join("")}`}</div>` : ""}`).join("")}</div>`;
-  if (D.slots.length || D.pact) c2 += `<div class="card"><h3>Spell slots</h3>${slotRows(D, P)}</div>`;
+  if (D.slots.length || D.pact || D.spellPoints) c2 += `<div class="card"><h3>${D.spellPoints ? "Spell points" : "Spell slots"}</h3>${slotRows(D, P)}</div>`;
   c2 += `<div class="card"><h3>Conditions</h3><div>${CONDITIONS.map(x => `<span class="chip ${P.conditions.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="cond" data-v="${x}">${x}</span>`).join("")}</div>
     <div class="row" style="margin-top:8px"><label>Exhaustion ${sel("play.exhaustion", exh, [0, 1, 2, 3, 4, 5, 6], { num: true })}</label>${exh ? `<span class="small warn">−${2 * exh} to d20 tests, −${5 * exh} ft speed${exh >= 6 ? " — DEAD" : ""}</span>` : ""}</div></div>`;
 
@@ -234,7 +244,7 @@ function sheetSpells(c, D) {
   c.spells.forEach(s => add(s.name, s.cls === "other" ? "Other" : CLASSES[s.cls]?.name || s.cls, false, s.level));
   let h = D.casters.map(cs => `<span class="chip acc roll" ${R(cs.name + " spell attack", cs.atk)}>${cs.name}: DC ${cs.dc} · Atk ${sgn(cs.atk)} 🎲</span>`).join("")
     + (D.speciesCast && D.alwaysSpells.some(s => s.cls === "species") ? `<span class="chip acc roll" ${R(D.speciesCast.name + " spell attack", D.speciesCast.atk)}>${esc(D.speciesCast.name)} spells: DC ${D.speciesCast.dc} · Atk ${sgn(D.speciesCast.atk)} (${ABBR[D.speciesCast.ability]}) 🎲</span>` : "") + `<button class="small ghost" data-act="goSpells" style="margin-left:6px">Change spells</button>`;
-  if (D.slots.length || D.pact) h += `<div class="spslots"><h3 style="margin:10px 0 4px">Spell slots</h3>${slotRows(D, c.play)}</div>`;
+  if (D.slots.length || D.pact || D.spellPoints) h += `<div class="spslots"><h3 style="margin:10px 0 4px">${D.spellPoints ? "Spell points" : "Spell slots"}</h3>${slotRows(D, c.play)}</div>`;
   if (!Object.keys(groups).length) return h + `<p class="muted">No spells.</p>`;
   const F = S.ui.spf || "", FILT = [["", "All"], ["A", "Action"], ["BA", "Bonus action"], ["R", "Reaction"], ["rit", "Ritual"], ["conc", "Concentration"]];
   const pass = s => !F || (F === "rit" ? s.si?.ritual : F === "conc" ? s.si?.conc : actKind("", s.si?.time) === F);
@@ -576,6 +586,9 @@ const ACT = {
     const rem = m - (store[0][store[1]] || 0); const nrem = i < rem ? rem - 1 : rem + 1;
     store[0][store[1]] = m - nrem; save(); render();
   },
+  spCast: el => { const c = S.char, D = derive(c), L = +el.dataset.l, cost = SPELL_POINT_COST[L], P = c.play;
+    if ((D.spellPoints.max - (+P.used.spellpoints || 0)) < cost) return toast("Not enough spell points");
+    P.used.spellpoints = (+P.used.spellpoints || 0) + cost; if (L >= 6) P.used["splvl" + L] = 1; save(); render(); toast(`Level ${L} spell — ${cost} points spent`); },
   resStep: el => { const k = el.dataset.k; S.char.play.used[k] = Math.max(0, (S.char.play.used[k] || 0) + +el.dataset.d); save(); render(); },
   cond: el => { const a = S.char.play.conditions; const v = el.dataset.v; const i = a.indexOf(v); i >= 0 ? a.splice(i, 1) : a.push(v); save(); render(); },
   insp: () => { S.char.play.inspiration = !S.char.play.inspiration; save(); render(); },
@@ -691,6 +704,7 @@ const ACT = {
 // change-type actions (inputs/selects/checkboxes)
 Object.assign(ACT, SPELL_ACT);
 const CHG = {
+  spMode: el => { S.char.spellPoints = el.value === "points"; },
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },
   grpToggle: el => { const m = S.modal, id = el.dataset.id; m.name = $("#grpname").value; m.ids = el.checked ? [...new Set([...m.ids, id])] : m.ids.filter(x => x !== id); },
   restChoice: el => { S.char.pools[el.dataset.k] = el.value ? [el.value] : []; },

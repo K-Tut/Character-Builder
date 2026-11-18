@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-16f";
+const APP_VERSION = "2026-11-18a";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -468,6 +468,10 @@ function bAbilities(c, D) {
 function bLevels(c, D) {
   let h = `<div class="card"><div class="row"><h3 style="margin:0">Levels</h3><span class="chip acc">Character level ${D.level}</span>
     <button class="right" data-act="levelup">⬆ ${D.level ? "Level up" : "Choose first class"}</button>${D.level ? `<button class="ghost" data-act="poplevel">Remove last level</button>` : ""}</div></div>`;
+  if (D.cls.sorcerer) h += `<div class="card"><h3>Sorcerer spellcasting</h3>
+    <label class="eqopt ${!c.spellPoints ? "on" : ""}"><input type="radio" name="spmode" data-act="spMode" value="slots" ${!c.spellPoints ? "checked" : ""}> <b>Spell slots</b> <span class="small muted">— the standard rules; Sorcery Points stay separate (Font of Magic converts between them)</span></label>
+    <label class="eqopt ${c.spellPoints ? "on" : ""}"><input type="radio" name="spmode" data-act="spMode" value="points" ${c.spellPoints ? "checked" : ""}> <b>Spell points</b> <span class="small muted">— variant rule (DMG): you spend points to cast; your Sorcery Points join the same pool, 1 : 1</span></label>
+    ${c.spellPoints && D.spellPoints ? `<p class="small" style="margin:6px 0 0">Pool now: <b>${D.spellPoints.max}</b> points (${D.spellPoints.base} spell points + ${D.spellPoints.sorc} Sorcery Points). Cost per spell level: ${SPELL_POINT_COST.slice(1, D.spellPoints.maxLvl + 1).map((x, i) => `L${i + 1}&nbsp;${x}`).join(" · ")}. Level 6+ once each per long rest.</p>` : ""}</div>`;
   c.levels.forEach((lv, i) => {
     const C = CLASSES[lv.cls], cl = classLevelAt(c, i);
     const feats = (C.features[cl] || []);
