@@ -421,3 +421,24 @@ function checkBonusDice(c, title) {
   const what = m[1].trim(), feats = allFeats(c).map(f => f.name);
   return CHECK_BONUS.filter(b => feats.includes(b.feat) && ((b.skills || []).includes(what) || (b.abilities || []).includes(what)));
 }
+
+// Rune Knight (Tasha's): runes are picked like maneuvers; each known rune can be invoked once per short rest (twice from level 15)
+const RUNE_DESC = {
+  "Cloud Rune": "Passive: Advantage on Dexterity (Sleight of Hand) and Charisma (Deception) checks.\nInvoke: Reaction when a creature you can see within 30 ft is hit by an attack roll — redirect the attack to another creature within 30 ft of you (not the attacker), using the same roll.",
+  "Fire Rune": "Passive: your Proficiency Bonus is doubled for ability checks with tools.\nInvoke: when you hit a creature with a weapon attack, it takes an extra 2d6 Fire damage and makes a Strength save (DC 8 + PB + Con) or is Restrained for 1 minute, taking 2d6 Fire at the start of each of its turns; it repeats the save at the end of each turn.",
+  "Frost Rune": "Passive: Advantage on Wisdom (Animal Handling) and Charisma (Intimidation) checks.\nInvoke: Bonus Action — for 10 minutes you gain +2 to ability checks and saving throws that use Strength or Constitution.",
+  "Stone Rune": "Passive: Advantage on Wisdom (Insight) checks, and Darkvision 120 ft.\nInvoke: Reaction when a creature you can see ends its turn within 30 ft — it makes a Wisdom save (DC 8 + PB + Con) or is Charmed for 1 minute (Incapacitated, Speed 0); it repeats the save at the end of each turn.",
+  "Hill Rune": "Fighter level 7+. Passive: Advantage on saves against being Poisoned, and Resistance to Poison damage.\nInvoke: Bonus Action — Resistance to Bludgeoning, Piercing and Slashing damage for 1 minute.",
+  "Storm Rune": "Fighter level 7+. Passive: Advantage on Intelligence (Arcana) checks, and you can't be surprised while you aren't Incapacitated.\nInvoke: Bonus Action — for 1 minute, when a creature you can see within 60 ft makes an attack roll, saving throw or ability check, you can use your Reaction to give it Advantage or Disadvantage."
+};
+POOLS.runes = { label: "Rune Carver (runes)", options: () => Object.keys(RUNE_DESC) };
+if (CLASSES.fighter.subclasses.runeknight) Object.assign(CLASSES.fighter.subclasses.runeknight, { pools: { runes: step({ 3: 2, 7: 3, 10: 4, 15: 5 }) },
+  notes: { "Giant's Might": l => "+1d" + (l >= 18 ? 10 : l >= 10 ? 8 : 6) + " once per turn" } });
+// fallback texts for options the wiki doesn't have as their own heading
+const OPTION_DESC = { ...RUNE_DESC };
+// things you switch on during play (shown with the conditions); res = the use it spends when switched on
+function playToggles(D) {
+  const out = [];
+  if (D.subs.fighter && /rune knight/i.test(D.subs.fighter.name)) out.push({ name: "Giant's Might", res: "giantsmight" });
+  return out;
+}

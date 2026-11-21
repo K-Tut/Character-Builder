@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-18a";
+const APP_VERSION = "2026-11-21a";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -346,7 +346,7 @@ function poolOptions(pk, D) {
   return [...set];
 }
 function poolLabel(pk) { return pk.startsWith("skills:") ? CLASSES[pk.slice(7)].name + " skill proficiencies" : POOLS[pk]?.label || pk; }
-const POOLS_WITH_INFO = new Set(["armorModel", "invocations", "metamagic", "maneuvers", "fightingStyle", "divineOrder", "primalOrder", "mastery"]);
+const POOLS_WITH_INFO = new Set(["armorModel", "invocations", "metamagic", "maneuvers", "runes", "fightingStyle", "divineOrder", "primalOrder", "mastery"]);
 const LANG_POOLS = new Set(["langOrigin", "langDeft"]);
 function optChoiceUI(pk, o, c, D) {
   const spec = OPTION_CHOICES[o]; if (!spec) return "";

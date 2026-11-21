@@ -337,6 +337,7 @@ function derive(c) {
   if (c.play.exhaustion) speed = Math.max(0, speed - 5 * c.play.exhaustion);
   D.speed = speed;
   D.darkvision = spc.darkvision || sp?.darkvision || 0;
+  if (D.pools.runes && (c.pools.runes || []).slice(0, D.pools.runes.max).includes("Stone Rune")) D.darkvision = Math.max(D.darkvision, 120);
   (c.extraFeats || []).map(xfParse).forEach(x => { if (x.sp && /darkvision/i.test(x.name)) D.darkvision = Math.max(D.darkvision, SPECIES[x.sp]?.darkvision || 60); });
   D.size = c.species.size || (sp ? sp.size.split(" or ")[0] : "Medium");
   D.resist = [...(sp?.resist || []), ...(spc.resist || [])];
@@ -422,7 +423,9 @@ function derive(c) {
   if (sp && c.species.id === "human") D.resources.push({ key: "heroic", name: "Heroic Inspiration (Resourceful)", max: 1, reset: "LR", feature: "Resourceful", src: "Human" });
   const replaced = new Set(Object.entries(D.subs).filter(([k]) => D.cls[k] >= 3).flatMap(([, s]) => s.replaces || []));
   if (replaced.size) D.resources = D.resources.filter(r => !replaced.has(r.feature));
-  if (D.spellPoints) D.resources = D.resources.filter(r => r.key !== "sorcery");   // they live in the spell point pool
+  if (D.spellPoints) D.resources = D.resources.filter(r => r.key !== "sorcery");
+  // Rune Knight: each known rune can be invoked once per short rest (twice from fighter level 15)
+  if (D.pools.runes) (c.pools.runes || []).slice(0, D.pools.runes.max).forEach(rn => D.resources.push({ key: "rune_" + norm(rn).replace(/ /g, "_"), name: rn, max: (D.cls.fighter || 0) >= 15 ? 2 : 1, reset: "SR", note: "invoke", die: "", feature: rn, src: "Rune Carver" }));   // they live in the spell point pool
   (c.custom || []).forEach((cf, i) => { if (+cf.uses > 0) D.resources.push({ key: "custom" + i, name: cf.name, max: +cf.uses, reset: cf.reset || "LR", feature: cf.name, src: "Custom" }); });
 
   // spells you can cast once per long rest without a slot -> one resource each (shared with the Spells tab)
@@ -510,7 +513,7 @@ function optionText(pk, o) {
   const keys = headingKeys(name);
   for (const k of keys) { const arr = S.idx.sec[k]; if (!arr) continue; for (const sl of prefer) { const h = arr.find(a => a.slug === sl); if (h) return stripSource(h.text); } }
   for (const k of keys) { const arr = S.idx.sec[k]; if (!arr) continue; const h = arr.find(a => a.cat !== "spell" && a.cat !== "feat") || arr.find(a => a.cat !== "spell"); if (h) return stripSource(h.text); }
-  return "";
+  return (typeof OPTION_DESC !== "undefined" && OPTION_DESC[name]) || "";
 }
 
 // ---------- features ----------
@@ -566,7 +569,7 @@ function collectFeatures(c, D) {
   }
   // pool picks (fighting styles, invocations, metamagic, maneuvers, orders)
   const poolSlugs = { invocations: ["warlock:main"], metamagic: ["sorcerer:main"], maneuvers: [subclassSlug("fighter", "battlemaster")], divineOrder: ["cleric:main"], primalOrder: ["druid:main"] };
-  for (const pk of ["fightingStyle", "invocations", "metamagic", "maneuvers", "divineOrder", "primalOrder", "armorModel"]) {
+  for (const pk of ["fightingStyle", "invocations", "metamagic", "maneuvers", "runes", "divineOrder", "primalOrder", "armorModel"]) {
     const p = D.pools[pk]; if (!p) continue;
     (c.pools[pk] || []).slice(0, p.max).forEach((o, i) => {
       const text = optionText(pk, o);

@@ -107,6 +107,7 @@ function damageRiders(c, D, a) {
   if (W && D.subs.ranger && /hunter/i.test(D.subs.ranger.name)) out.push({ name: "Colossus Slayer", n: 1, s: 8, type: T, note: "target below max HP, once per turn" });
   if (W && D.subs.barbarian && /zealot/i.test(D.subs.barbarian.name)) out.push({ name: "Divine Fury", n: 1, s: 6, plus: Math.floor(D.cls.barbarian / 2), type: "radiant", note: "first hit each turn while raging" });
   if (W && (D.cls.cleric || 0) >= 7) out.push({ name: "Divine Strike", n: 1, s: 8, type: "radiant", note: "Blessed Strikes, once per turn" });
+  if (W && (c.play.conditions || []).includes("Giant's Might")) { const fl = D.cls.fighter || 0; out.push({ name: "Giant's Might", n: 1, s: fl >= 18 ? 10 : fl >= 10 ? 8 : 6, type: T, note: "once per turn", auto: true }); }
   if (W && a.heavy && D.feats.some(f => f.name === "Great Weapon Master")) out.push({ name: "Great Weapon Master", flat: D.pb, type: T });
   if (D.subs.warlock && /hexblade/i.test(D.subs.warlock.name)) out.push({ name: "Hexblade's Curse", flat: D.pb, type: T, note: "cursed target" });
   return out;
@@ -199,7 +200,9 @@ function renderSheet() {
   if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b class="resname" data-act="resInfo" data-k="${esc(r.key)}" title="Show description">${esc(r.name)} <span class="small muted">ⓘ</span></b>${actTag(resKind(r, featsAll))}${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${r.key === "portent" ? portentDice(r, P) : pips(r.key, r.max, P.used[r.key])}</div>${resChildren(r, D, featsAll).map(k => `<div class="reskid" data-act="resKid" data-k="${esc(r.key)}" data-n="${esc(k.name)}"><span class="kidarrow">↳</span><b>${esc(k.name)}</b>${actTag(actKind(k.text))}<span class="small muted">ⓘ</span></div>`).join("")}
     ${r.forms ? `<div class="row small formrow">${(P.active || {})[r.key] ? `<span class="chip acc">Active: ${esc(P.active[r.key])}</span><a href="#" data-act="endForm" data-k="${r.key}">end</a>` : `<span class="muted">Use as:</span>${r.forms.map(f => `<button class="small ghost" data-act="useForm" data-k="${r.key}" data-f="${esc(f)}">${esc(f)}</button>`).join("")}`}</div>` : ""}`).join("")}</div>`;
   if (D.slots.length || D.pact || D.spellPoints) c2 += `<div class="card"><h3>${D.spellPoints ? "Spell points" : "Spell slots"}</h3>${slotRows(D, P)}</div>`;
-  c2 += `<div class="card"><h3>Conditions</h3><div>${CONDITIONS.map(x => `<span class="chip ${P.conditions.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="cond" data-v="${x}">${x}</span>`).join("")}</div>
+  const tg = playToggles(D);
+  c2 += `<div class="card"><h3>Conditions</h3>${tg.length ? `<div style="margin-bottom:6px">${tg.map(t => { const on = P.conditions.includes(t.name), r = D.resources.find(x => x.key === t.res), left = r ? r.max - (P.used[t.res] || 0) : 0;
+      return `<span class="chip tog ${on ? "acc on" : ""}" data-act="playTog" data-v="${esc(t.name)}" data-r="${t.res || ""}">⚡ ${esc(t.name)} ${on ? "· ON" : r ? `· ${left} left` : ""}</span>`; }).join("")}</div>` : ""}<div>${CONDITIONS.map(x => `<span class="chip ${P.conditions.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="cond" data-v="${x}">${x}</span>`).join("")}</div>
     <div class="row" style="margin-top:8px"><label>Exhaustion ${sel("play.exhaustion", exh, [0, 1, 2, 3, 4, 5, 6], { num: true })}</label>${exh ? `<span class="small warn">−${2 * exh} to d20 tests, −${5 * exh} ft speed${exh >= 6 ? " — DEAD" : ""}</span>` : ""}</div></div>`;
 
   // column 3: tabs
@@ -590,6 +593,10 @@ const ACT = {
     if ((D.spellPoints.max - (+P.used.spellpoints || 0)) < cost) return toast("Not enough spell points");
     P.used.spellpoints = (+P.used.spellpoints || 0) + cost; if (L >= 6) P.used["splvl" + L] = 1; save(); render(); toast(`Level ${L} spell — ${cost} points spent`); },
   resStep: el => { const k = el.dataset.k; S.char.play.used[k] = Math.max(0, (S.char.play.used[k] || 0) + +el.dataset.d); save(); render(); },
+  playTog: el => { const c = S.char, P = c.play, v = el.dataset.v, k = el.dataset.r, i = P.conditions.indexOf(v);
+    if (i >= 0) { P.conditions.splice(i, 1); save(); render(); return; }
+    if (k) { const r = derive(c).resources.find(x => x.key === k); if (r && (P.used[k] || 0) >= r.max) return toast("No uses of " + v + " left"); if (r) P.used[k] = (P.used[k] || 0) + 1; }
+    P.conditions.push(v); save(); render(); toast(v + " on"); },
   cond: el => { const a = S.char.play.conditions; const v = el.dataset.v; const i = a.indexOf(v); i >= 0 ? a.splice(i, 1) : a.push(v); save(); render(); },
   insp: () => { S.char.play.inspiration = !S.char.play.inspiration; save(); render(); },
   showHidden: () => { S.ui.showHidden = !S.ui.showHidden; render(); },
@@ -602,7 +609,7 @@ const ACT = {
     if (S.modal) closeModal();
     const P = S.char.play, D = derive(S.char);
     Object.assign(P, { hp: D.hpMax, temp: 0, used: {}, slots: {}, pact: 0, hd: {}, ds: { s: 0, f: 0 }, active: {}, exhaustion: Math.max(0, (+P.exhaustion || 0) - 1) });
-    P.conditions = P.conditions.filter(x => x !== "Raging" && x !== "Concentrating");
+    P.conditions = P.conditions.filter(x => x !== "Raging" && x !== "Concentrating" && !playToggles(D).some(t => t.name === x));
     const tmp = Math.max(0, ...(D.restChoices || []).map(r => r.pick && r.ch.lrTemp?.[r.pick] ? r.ch.lrTemp[r.pick](D.cls[r.cls], D) : 0)); if (tmp) P.temp = tmp;
     const pr = rollPortent(D);
     save(); render(); toast("Long rest complete" + (pr ? " · Portent: " + pr : ""));
