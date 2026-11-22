@@ -505,6 +505,8 @@ function classLine(D) {
 
 // ---------- option descriptions (invocations, metamagic, maneuvers, fighting styles…) ----------
 function optionText(pk, o) {
+  if (pk === "plans") { const m = typeof MAGIC_ITEMS !== "undefined" && MAGIC_ITEMS[o];
+    return m ? `${m.r}\n\n${m.t}\n\n${m.own ? "(Short summary — this item is not in the free SRD; see the book for the full text.)" : "(Text: SRD 5.2.1, CC-BY-4.0)"}` : "Not in the free SRD and no summary bundled yet — see the book."; }
   const name = String(o).replace(/\s*\((Slow|Nick|Push|Sap|Topple|Vex|Graze|Cleave)\)$/, "");
   const prefer = { invocations: ["warlock:main", "warlock:eldritch-invocations", "warlock:invocations"], metamagic: ["sorcerer:main", "sorcerer:metamagic"],
     maneuvers: [subclassSlug("fighter", "battlemaster"), "fighter:battle-master", "fighter:maneuvers"], divineOrder: ["cleric:main"], primalOrder: ["druid:main"], armorModel: [subclassSlug("artificer", "armorer")], fightingStyle: [] }[pk] || [];
@@ -571,7 +573,7 @@ function collectFeatures(c, D) {
   }
   // pool picks (fighting styles, invocations, metamagic, maneuvers, orders)
   const poolSlugs = { invocations: ["warlock:main"], metamagic: ["sorcerer:main"], maneuvers: [subclassSlug("fighter", "battlemaster")], divineOrder: ["cleric:main"], primalOrder: ["druid:main"] };
-  for (const pk of ["fightingStyle", "invocations", "metamagic", "maneuvers", "runes", "divineOrder", "primalOrder", "armorModel"]) {
+  for (const pk of ["fightingStyle", "invocations", "metamagic", "maneuvers", "runes", "divineOrder", "primalOrder", "armorModel", "plans"]) {
     const p = D.pools[pk]; if (!p) continue;
     (c.pools[pk] || []).slice(0, p.max).forEach((o, i) => {
       const text = optionText(pk, o);
