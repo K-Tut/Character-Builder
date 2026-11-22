@@ -587,3 +587,12 @@ body.hasenergy main { padding-left: 46px; }
 .stat.buffed .v, .stat.buffed .k { color: #ffd36b; }
 @keyframes bglow { 50% { text-shadow: 0 0 14px rgba(255,210,90,1), 0 0 3px rgba(255,255,255,.6); } }
 .buffplus { font-size: 11px; color: #ffd36b; font-weight: 700; }
+.lvtap { cursor: pointer; }
+.lvl.lvopen { border-left-width: 5px; }
+.lvchips { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; margin-top: 2px; }
+.lvfeats { margin-top: 8px; }
+.lvfeats details { border-top: 1px solid var(--line, rgba(128,128,128,.25)); padding: 6px 0; }
+.lvfeats summary { cursor: pointer; }
+.lvchoice { margin-top: 10px; padding: 8px; border-radius: 8px; background: rgba(128,128,128,.08); }
+.lvpick { margin-top: 6px; gap: 8px; }
+.lvpick select { flex: 1; min-width: 0; }

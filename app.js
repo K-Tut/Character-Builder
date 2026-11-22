@@ -510,7 +510,7 @@ function optionText(pk, o) {
     maneuvers: [subclassSlug("fighter", "battlemaster"), "fighter:battle-master", "fighter:maneuvers"], divineOrder: ["cleric:main"], primalOrder: ["druid:main"], armorModel: [subclassSlug("artificer", "armorer")], fightingStyle: [] }[pk] || [];
   if (pk === "fightingStyle") { const s = (S.idx.pages.feat || []).find(p => p.n === norm(name)); if (s) return pageText(s.slug); }
   if (pk === "mastery") { const s = (S.idx.pages.mastery || []).find(p => p.n === norm(name)); if (s) return pageText(s.slug); }
-  for (const cat of ["invocation", "eldritch-invocation", "metamagic", "maneuver"]) { const s = (S.idx.pages[cat] || []).find(p => p.n === norm(name)); if (s) return pageText(s.slug); }
+  for (const cat of ["invocation", "eldritch-invocation", "metamagic", "maneuver", ...(pk === "plans" ? ["magic-item", "item", "magic-items", "wondrous-item"] : [])]) { const s = (S.idx.pages[cat] || []).find(p => p.n === norm(name)); if (s) return pageText(s.slug); }
   // exact heading match only, preferring the right class pages
   const keys = headingKeys(name);
   for (const k of keys) { const arr = S.idx.sec[k]; if (!arr) continue; for (const sl of prefer) { const h = arr.find(a => a.slug === sl); if (h) return stripSource(h.text); } }

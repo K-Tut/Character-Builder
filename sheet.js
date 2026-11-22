@@ -586,6 +586,7 @@ const ACT = {
   del: el => { const arr = getPath(target(), el.dataset.p); arr.splice(+el.dataset.i, 1); if (el.dataset.p === "custom") { S.char.featureMeta = Object.fromEntries(Object.entries(S.char.featureMeta).filter(([k]) => !k.startsWith("custom:"))); } save(); render(); },
   spellDel: (el, e) => { e.preventDefault(); S.char.spells = S.char.spells.filter(s => !(s.name === el.dataset.n && s.cls === el.dataset.c)); save(); render(); },
   spellAddMan: el => { const n = $("#spman").value.trim(); if (!n) return; S.char.spells.push({ name: n, cls: el.dataset.c, level: +$("#spmanl").value }); save(); render(); },
+  lvlOpen: el => { const o = S.ui.lvOpen ||= {}; o[el.dataset.i] = !o[el.dataset.i]; render(); },
   toggleOpen: (el, e) => { if (e.target.closest("button, input, a")) return; const b = el.closest(".feat, .spell")?.querySelector(".body"); if (b) b.classList.toggle("hidden"); },
   hp: el => {
     const c = S.char, D = derive(c), P = c.play; const amt = Math.abs(parseInt($("#hpAmt").value) || 0); if (!amt) return;
@@ -727,6 +728,7 @@ const CHG = {
   spMode: el => { S.char.spellPoints = el.value === "points"; },
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },
   grpToggle: el => { const m = S.modal, id = el.dataset.id; m.name = $("#grpname").value; m.ids = el.checked ? [...new Set([...m.ids, id])] : m.ids.filter(x => x !== id); },
+  poolSet: el => { const t = target(), a = t.pools[el.dataset.k] ||= [], j = +el.dataset.j; if (!el.value) { if (j < a.length) a.splice(j, 1); } else if (j < a.length) a[j] = el.value; else a.push(el.value); },
   restChoice: el => { S.char.pools[el.dataset.k] = el.value ? [el.value] : []; },
   freeToggle: el => { const n = el.dataset.n, a = S.char.freeCasts ||= []; const i = a.indexOf(n); i >= 0 ? a.splice(i, 1) : a.push(n); },
   spAtkSpell: el => { readSpAtk(); const old = S.modal.d; S.modal.d = el.value ? spellAttackPrefill(el.value, derive(S.char)) : { ...old, spell: "" }; },

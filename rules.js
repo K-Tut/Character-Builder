@@ -640,6 +640,19 @@ const INVOCATION_PREREQ = {
   "Witch Sight": [15]
 };
 POOLS.invocations.prereq = INVOCATION_PREREQ;
+// Artificer Replicate Magic Item plans (2024), grouped by the artificer level that unlocks them
+const PLAN_LEVELS = {
+  2: ["Alchemy Jug", "Bag of Holding", "Cap of Water Breathing", "Goggles of Night", "Manifold Tool", "Repeating Shot", "Returning Weapon", "Rope of Climbing", "Sending Stones", "Shield, +1", "Wand of Magic Detection", "Wand of Secrets", "Wand of the War Mage, +1", "Weapon, +1", "Wraps of Unarmed Power, +1",
+    "Adventurer's Ring", "Clockwork Amulet", "Dark Shard Amulet", "Everbright Lantern", "Hat of Vermin", "Hat of Wizardry", "Mind Crystal (Common)", "Perfume of Bewitching", "Pot of Awakening", "Ruby of the War Mage"],
+  6: ["Armor, +1", "Boots of Elvenkind", "Boots of the Winding Path", "Cloak of Elvenkind", "Cloak of the Manta Ray", "Dazzling Weapon", "Eyes of Charming", "Eyes of Minute Seeing", "Gloves of Thievery", "Helm of Awareness", "Lantern of Revealing", "Mind Sharpener", "Necklace of Adaptation", "Pipes of Haunting", "Repulsion Shield", "Ring of Swimming", "Ring of Water Walking", "Sentinel Shield", "Spell-Refueling Ring", "Wand of Magic Missiles", "Wand of Web", "Weapon of Warning"],
+  10: ["Armor of Resistance", "Dagger of Venom", "Elven Chain", "Ring of Feather Falling", "Ring of Jumping", "Ring of Mind Shielding", "Shield, +2", "Wand of the War Mage, +2", "Weapon, +2", "Wraps of Unarmed Power, +2",
+    "Amulet of Proof against Detection and Location", "Boots of Striding and Springing", "Bracers of Archery", "Brooch of Shielding", "Broom of Flying", "Cloak of Protection", "Decanter of Endless Water", "Eyes of the Eagle", "Gauntlets of Ogre Power", "Headband of Intellect", "Pearl of Power", "Periapt of Health", "Periapt of Wound Closure", "Slippers of Spider Climbing", "Stone of Good Luck", "Winged Boots"],
+  14: ["Armor, +2", "Arrow-Catching Shield", "Flame Tongue", "Ring of Free Action", "Ring of Protection", "Ring of the Ram",
+    "Amulet of Health", "Belt of Dwarvenkind", "Boots of Speed", "Cloak of Displacement", "Cloak of the Bat", "Cube of Force", "Gem of Seeing", "Necklace of Fireballs", "Periapt of Proof against Poison", "Portable Hole", "Robe of Eyes", "Wings of Flying"]
+};
+POOLS.plans = { label: "Magic Item Plans (Replicate Magic Item)", options: () => Object.values(PLAN_LEVELS).flat(), prereqCls: "artificer", prereqWord: "Artificer",
+  prereq: Object.fromEntries(Object.entries(PLAN_LEVELS).flatMap(([l, a]) => a.map(n => [n, [+l]]))) };
+CLASSES.artificer.pools = { ...(CLASSES.artificer.pools || {}), plans: step({ 2: 4, 6: 5, 10: 6, 14: 7, 18: 8 }) };
 
 // ---------- LANGUAGES ----------
 const LANG_STANDARD = ["Common Sign Language", "Draconic", "Dwarvish", "Elvish", "Giant", "Gnomish", "Goblin", "Halfling", "Orc"];

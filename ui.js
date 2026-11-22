@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-22i";
+const APP_VERSION = "2026-11-22j";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -368,7 +368,7 @@ function poolOptions(pk, D) {
   return [...set];
 }
 function poolLabel(pk) { return pk.startsWith("skills:") ? CLASSES[pk.slice(7)].name + " skill proficiencies" : POOLS[pk]?.label || pk; }
-const POOLS_WITH_INFO = new Set(["armorModel", "invocations", "metamagic", "maneuvers", "runes", "fightingStyle", "divineOrder", "primalOrder", "mastery"]);
+const POOLS_WITH_INFO = new Set(["plans", "armorModel", "invocations", "metamagic", "maneuvers", "runes", "fightingStyle", "divineOrder", "primalOrder", "mastery"]);
 const LANG_POOLS = new Set(["langOrigin", "langDeft"]);
 function optChoiceUI(pk, o, c, D) {
   const spec = OPTION_CHOICES[o]; if (!spec) return "";
@@ -428,9 +428,9 @@ function poolPicker(pk, D, c, oldMax) {
   let body;
   if (!pre) body = opts.map(o => row(o)).join("");
   else {
-    const lvl = D.cls.warlock || 0, groups = {};
+    const lvl = D.cls[POOLS[pk].prereqCls || "warlock"] || 0, word = POOLS[pk].prereqWord || "Warlock", groups = {};
     opts.forEach(o => { const l = (pre[o] || [1])[0]; (groups[l] ||= []).push(o); });
-    body = Object.keys(groups).sort((a, b) => a - b).map(l => `<div class="pgrp">${+l === 1 ? "No level prerequisite" : "Warlock level " + l + "+"}${lvl < +l ? ` <span class="muted" style="text-transform:none;font-weight:600">— unlocks at level ${l}</span>` : ""}</div>`
+    body = Object.keys(groups).sort((a, b) => a - b).map(l => `<div class="pgrp">${+l === 1 ? "No level prerequisite" : word + " level " + l + "+"}${lvl < +l ? ` <span class="muted" style="text-transform:none;font-weight:600">— unlocks at level ${l}</span>` : ""}</div>`
       + groups[l].map(o => row(o, lvl < +l, (pre[o] || [])[1] ? "needs " + pre[o][1] : "")).join("")).join("");
   }
   return `<div style="margin:10px 0">${head}<div class="optlist">${body}</div></div>`;
@@ -496,21 +496,57 @@ function bLevels(c, D) {
     <label class="eqopt ${!c.spellPoints ? "on" : ""}"><input type="radio" name="spmode" data-act="spMode" value="slots" ${!c.spellPoints ? "checked" : ""}> <b>Spell slots</b> <span class="small muted">— the standard rules; Sorcery Points stay separate (Font of Magic converts between them)</span></label>
     <label class="eqopt ${c.spellPoints ? "on" : ""}"><input type="radio" name="spmode" data-act="spMode" value="points" ${c.spellPoints ? "checked" : ""}> <b>Spell points</b> <span class="small muted">— variant rule (DMG): you spend points to cast; your Sorcery Points join the same pool, 1 : 1</span></label>
     ${c.spellPoints && D.spellPoints ? `<p class="small" style="margin:6px 0 0">Pool now: <b>${D.spellPoints.max}</b> points (${D.spellPoints.base} spell points + ${D.spellPoints.sorc} Sorcery Points). Cost per spell level: ${SPELL_POINT_COST.slice(1, D.spellPoints.maxLvl + 1).map((x, i) => `L${i + 1}&nbsp;${x}`).join(" · ")}. Level 6+ once each per long rest.</p>` : ""}</div>`;
+  const LG = levelGrants(c), open = S.ui.lvOpen ||= {};
   c.levels.forEach((lv, i) => {
     const C = CLASSES[lv.cls], cl = classLevelAt(c, i);
     const feats = (C.features[cl] || []);
     const sub = D.subs[lv.cls];
     const names = feats.map(n => n === "@sub" ? (sub ? sub.name + ": " + ((sub.features[cl] || []).join(", ") || "—") : "Subclass") : n === "@asi" ? "Ability Score Improvement" : n === "@boon" ? "Epic Boon" : n);
-    h += `<div class="lvl"><div class="row"><b>Level ${i + 1}</b> — ${C.name} ${cl}<span class="muted small">${names.join(" · ")}</span>
+    const g = LG[i] || [], isOpen = !!open[i];
+    const picksTxt = g.map(x => (c.pools[x.k] || []).slice(x.from, x.to).filter(Boolean)).flat();
+    const asiTxt = lv.asi ? (lv.asi.mode === "feat" ? lv.asi.feat?.name : [lv.asi.a1, lv.asi.a2].filter(Boolean).map(a => ABBR[a] || a).join(" + ")) : "";
+    h += `<div class="lvl ${isOpen ? "lvopen" : ""}"><div class="row"><b class="lvtap" data-act="lvlOpen" data-i="${i}">${isOpen ? "▾" : "▸"} Level ${i + 1}</b><span class="lvtap" data-act="lvlOpen" data-i="${i}">— ${C.name} ${cl}</span><span class="muted small lvtap" data-act="lvlOpen" data-i="${i}">${names.join(" · ")}</span>
+      ${!isOpen && (picksTxt.length || asiTxt) ? `<div class="lvchips lvtap" data-act="lvlOpen" data-i="${i}">${[asiTxt, ...picksTxt].filter(Boolean).map(t => `<span class="chip">${esc(t)}</span>`).join("")}${g.some(x => (c.pools[x.k] || []).slice(x.from, x.to).filter(Boolean).length < x.to - x.from) ? '<span class="chip warn">choice missing</span>' : ""}</div>` : ""}
       <span class="right small">HP: ${i === 0 ? `${C.hd} (max)` : `${inp(`levels.${i}.hp`, lv.hp ?? (C.hd / 2 + 1), { type: "number", attr: `min="1" max="${C.hd}"` })} / d${C.hd}`}</span></div>
       ${feats.includes("@sub") && cl === Object.keys(C.features).find(k => C.features[k].includes("@sub")) * 1 ? `<div class="row" style="margin-top:6px"><label>Subclass: ${sel("subclasses." + lv.cls, c.subclasses[lv.cls], Object.entries(C.subclasses).map(([k, s]) => [k, s.name + (s.legacy ? " (2014)" : "")]), { blank: "— choose —" })}</label></div>
       ${c.subclasses[lv.cls] ? `<details class="subdet"><summary class="small"><b>📖 Everything ${esc(C.subclasses[c.subclasses[lv.cls]]?.name || "")} gives</b> (now and at later levels)</summary>${subOverview(lv.cls, c.subclasses[lv.cls], D.cls[lv.cls])}</details>` : ""}` : ""}
-      ${feats.includes("@asi") || feats.includes("@boon") ? asiEditor(`levels.${i}.asi`, lv.asi, D, feats.includes("@boon")) : ""}
+      ${isOpen ? levelDetail(c, D, i, lv.cls, cl, g) : ""}
+      ${isOpen && (feats.includes("@asi") || feats.includes("@boon")) ? asiEditor(`levels.${i}.asi`, lv.asi, D, feats.includes("@boon")) : ""}
     </div>`;
   });
   const pk = Object.keys(D.pools);
   if (pk.length) h += `<div class="card"><h3>Class & species options</h3><p class="small muted">Skill choices, expertise, weapon masteries, fighting styles, invocations… You can change these any time (e.g. swapping a mastery after a long rest).</p>${pk.map(k => poolPicker(k, D, c)).join("")}</div>`;
   return h;
+}
+// which pool picks belong to which level: compare the pool sizes of the character cut off after each level
+function levelGrants(c) {
+  const out = [], base = derive({ ...c, levels: [] }).pools; let prev = {};
+  for (let i = 0; i < c.levels.length; i++) {
+    const P = derive({ ...c, levels: c.levels.slice(0, i + 1) }).pools, g = [];
+    for (const k in P) { const was = prev[k] ?? (base[k]?.max || 0); if (P[k].max > was) g.push({ k, from: was, to: P[k].max }); }
+    out.push(g); prev = Object.fromEntries(Object.entries(P).map(([k, v]) => [k, v.max]));
+  }
+  return out;
+}
+// what a level gives: its features (tap to read) and the choices made there (change them in place)
+function levelDetail(c, D, i, cls, cl, g) {
+  const C = CLASSES[cls], feats = C.features[cl] || [], sub = D.subs[cls], list = [];
+  feats.forEach(n => { if (n === "@sub") { if (sub) (sub.features[cl] || []).forEach(x => list.push([x, sub.name, true])); } else if (n !== "@asi" && n !== "@boon") list.push([n, C.name, false]); });
+  const slug = classSlug(cls), ss = c.subclasses[cls] ? subclassSlug(cls, c.subclasses[cls]) : null;
+  let h = list.length ? `<div class="lvfeats">${list.map(([n, src, isSub]) => `<details><summary><b>${esc(n)}</b> <span class="muted small">${esc(src)}</span>${C.notes?.[n] ? ` <span class="chip">${esc(C.notes[n](cl, D))}</span>` : ""}</summary><div class="desc">${para(lookup(n, [ss, slug].filter(Boolean), isSub ? subDesc(cls, c.subclasses[cls], n) : "")) || '<span class="muted">No description imported.</span>'}</div></details>`).join("")}</div>` : "";
+  for (const { k, from, to } of g) {
+    const cur = c.pools[k] || [], opts = poolOptions(k, D), pre = POOLS[k]?.prereq, lvlNow = pre ? (D.cls[POOLS[k].prereqCls || "warlock"] || 0) : 99;
+    h += `<div class="lvchoice"><b class="small">${esc(poolLabel(k))}</b>${to - from > 1 ? ` <span class="small muted">(${to - from} picks at this level)</span>` : ""}`;
+    for (let j = from; j < to; j++) {
+      const v = cur[j] || "", others = new Set(cur.filter((x, n) => n !== j));
+      const ok = opts.filter(o => o === v || ((POOLS[k]?.repeat || !others.has(o)) && (!pre || (pre[o] || [1])[0] <= lvlNow)));
+      h += `<div class="row lvpick"><select data-act="poolSet" data-k="${esc(k)}" data-j="${j}"><option value="">— choose —</option>${ok.map(o => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>
+        ${v && POOLS_WITH_INFO.has(k) ? `<a href="#" class="small" data-act="optToggle" data-k="${esc(k + "|" + v)}">${S.ui.optOpen?.[k + "|" + v] ? "▾ hide" : "▸ details"}</a>` : ""}</div>
+        ${v && S.ui.optOpen?.[k + "|" + v] ? `<div class="desc optdesc">${para(optionText(k, v)) || '<span class="muted">No description found in the imported rules text.</span>'}</div>` : ""}`;
+    }
+    h += `</div>`;
+  }
+  return h || '<p class="small muted">Nothing to choose at this level.</p>';
 }
 function asiEditor(path, a, D, boon) {
   a = a || {};
