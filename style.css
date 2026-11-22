@@ -544,8 +544,8 @@ body.hasenergy main { padding-left: 46px; }
 /* tiles */
 .ctiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
 @media (min-width: 900px) { .ctiles { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); } }
-.ctile { position: relative; aspect-ratio: 3 / 4; border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--chip); border: 1px solid var(--line); box-shadow: 0 3px 10px rgba(0,0,0,.3); }
-.ctile img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; display: block; }
+.ctile { position: relative; aspect-ratio: 5 / 8; border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--chip); border: 1px solid var(--line); box-shadow: 0 3px 10px rgba(0,0,0,.3); }
+.ctile img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
 .ctile .ccph { font-size: 34px; }
 .ctwrap { cursor: pointer; min-width: 0; }
 .ctwrap:active { transform: scale(.97); }
