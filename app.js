@@ -144,7 +144,7 @@ function newChar() {
     species: { id: "", choice: "", size: "" }, speciesFeat: null,
     background: { id: "", mode: "21", plus2: "", plus1: "", tool: "" }, bgFeat: { picks: {} },
     abilMethod: "pointbuy", base: { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 },
-    levels: [], subclasses: {}, pools: {}, spells: [],
+    levels: [], subclasses: {}, pools: {}, spells: [], skillAbil: {},
     armor: "", shield: false, acBonus: 0, initBonus: 0, speedBonus: 0, hpBonus: 0,
     weapons: [], items: [], coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     languages: "Common", langExtra: "", optChoices: {}, otherProfs: "", phys: { age: "", height: "", weight: "", eyes: "", hair: "", skin: "", alignment: "" },
@@ -263,7 +263,7 @@ function derive(c) {
   // jack of all trades
   const jack = (D.cls.bard || 0) >= 2 ? Math.floor(D.pb / 2) : 0;
   D.skill = {};
-  ALL_SKILLS.forEach(s => { const a = SKILLS[s]; D.skill[s] = { v: D.mod[a] + (exp.has(s) ? 2 * D.pb : prof.has(s) ? D.pb : jack), p: prof.has(s), e: exp.has(s), a }; });
+  ALL_SKILLS.forEach(s => { const a = (c.skillAbil || {})[s] || SKILLS[s]; D.skill[s] = { v: D.mod[a] + (exp.has(s) ? 2 * D.pb : prof.has(s) ? D.pb : jack), p: prof.has(s), e: exp.has(s), a }; });
   // languages: Common + 2 standard + class languages + Deft Explorer + extras
   const langs = ["Common"];
   const addL = l => { l = String(l || "").trim(); if (l && !langs.some(x => x.toLowerCase() === l.toLowerCase())) langs.push(l); };
@@ -272,6 +272,7 @@ function derive(c) {
   picked("langDeft").slice(0, D.pools.langDeft?.max || 0).forEach(addL);
   String(c.langExtra || "").split(/[,;]/).forEach(addL);
   D.languages = langs;
+  D.skillAdv = typeof skillAdvantages === "function" ? skillAdvantages(c, D) : {};
   D.passive = { perception: 10 + D.skill.Perception.v, insight: 10 + D.skill.Insight.v, investigation: 10 + D.skill.Investigation.v };
 
   // armor & weapon training

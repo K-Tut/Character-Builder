@@ -442,3 +442,11 @@ function playToggles(D) {
   if (D.subs.fighter && /rune knight/i.test(D.subs.fighter.name)) out.push({ name: "Giant's Might", res: "giantsmight" });
   return out;
 }
+
+// passive Advantage on checks from known runes (Rune Knight)
+const RUNE_SKILL_ADV = { "Cloud Rune": ["Sleight of Hand", "Deception"], "Frost Rune": ["Animal Handling", "Intimidation"], "Stone Rune": ["Insight"], "Storm Rune": ["Arcana"] };
+function skillAdvantages(c, D) {
+  const out = {};
+  if (D.pools?.runes) (c.pools.runes || []).slice(0, D.pools.runes.max).forEach(rn => (RUNE_SKILL_ADV[rn] || []).forEach(s => (out[s] ||= []).push(rn)));
+  return out;
+}

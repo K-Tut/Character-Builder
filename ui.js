@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-22a";
+const APP_VERSION = "2026-11-22b";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -156,7 +156,7 @@ function homeMode() { try { return localStorage.getItem("homeMode") || "list"; }
 // card view: one big picture card per character, sorted by class and then by name, scrolled sideways
 function renderCharCards() {
   if (!S.chars.length) return `<p class="muted">No characters yet — create one!</p>`;
-  const list = S.chars.slice().sort((a, b) => (a.cls ? 0 : 1) - (b.cls ? 0 : 1) || (a.cls || "").localeCompare(b.cls || "") || (a.name || "").localeCompare(b.name || ""));
+  const list = sortedByClass();
   let last = null;
   const cards = list.map(c => {
     const head = c.cls !== last ? `<div class="ccdiv"><span>${esc(c.cls || "No class yet")}</span></div>` : ""; last = c.cls;
@@ -165,6 +165,14 @@ function renderCharCards() {
       <div class="ccinfo"><b>${esc(c.name || "Unnamed")}</b><span>${esc([c.cls ? c.cls + (c.multi ? " +" : "") : "", c.sub].filter(Boolean).join(" · ") || "—")}</span><small>Level ${c.lvl}${c.group ? " · " + esc(c.group) : ""}</small></div></div>`;
   }).join("");
   return `<div class="ccwrap"><button class="ghost ccnav prev" data-act="ccScroll" data-d="-1" aria-label="Back">‹</button><div class="cctrack" id="cctrack">${cards}</div><button class="ghost ccnav next" data-act="ccScroll" data-d="1" aria-label="Forward">›</button></div>`;
+}
+function sortedByClass() { return S.chars.slice().sort((a, b) => (a.cls ? 0 : 1) - (b.cls ? 0 : 1) || (a.cls || "").localeCompare(b.cls || "") || (a.name || "").localeCompare(b.name || "")); }
+// tile view: three pictures per row, name top left, class bottom centre
+function renderCharTiles() {
+  if (!S.chars.length) return `<p class="muted">No characters yet — create one!</p>`;
+  return `<div class="ctiles">${sortedByClass().map(c => { const img = c.portrait || c.thumb;
+    return `<div class="ctile" data-act="open" data-id="${esc(c.id)}">${img ? `<img src="${img}" alt="" loading="lazy">` : `<div class="ccph">🛡</div>`}
+      <b class="ctname">${esc(c.name || "Unnamed")}</b><span class="ctcls">${esc(c.cls ? c.cls + (c.multi ? " +" : "") : "—")} · ${c.lvl}</span></div>`; }).join("")}</div>`;
 }
 function openGroups() { try { return JSON.parse(localStorage.getItem("openGroups") || "[]"); } catch (e) { return []; } }
 // characters grouped by their "group" name (stored on each character, so it syncs and exports with it)
@@ -185,8 +193,8 @@ function renderHome() {
   const imp = S.ui.import || {}; const st = S.settings || {};
   const syncOn = Sync.enabled();
   return `
-  <div class="card"><div class="row"><h2 style="margin:0">Your characters</h2><span class="viewtog" title="How to show your characters"><button class="small ${homeMode() === "list" ? "on" : ""}" data-act="homeMode" data-v="list" title="List">☰ List</button><button class="small ${homeMode() === "cards" ? "on" : ""}" data-act="homeMode" data-v="cards" title="Cards">🂠 Cards</button></span><button class="right" data-act="new">+ New</button><button class="ghost" data-act="importJson">⤒ Import</button><button class="ghost" data-act="exportAll" title="Save all characters in one file (Import reads it back)">⤓ Export all</button><button class="ghost" data-act="groupEdit" data-g="" title="Put characters together in a named group">🗂 New group</button></div></div>
-  ${homeMode() === "cards" ? renderCharCards() : renderCharGroups()}
+  <div class="card"><div class="row"><h2 style="margin:0">Your characters</h2><span class="viewtog" title="How to show your characters"><button class="small ${homeMode() === "list" ? "on" : ""}" data-act="homeMode" data-v="list" title="List">☰ List</button><button class="small ${homeMode() === "cards" ? "on" : ""}" data-act="homeMode" data-v="cards" title="Cards">🂠 Cards</button><button class="small ${homeMode() === "tiles" ? "on" : ""}" data-act="homeMode" data-v="tiles" title="Tiles">▦ Tiles</button></span><button class="right" data-act="new">+ New</button><button class="ghost" data-act="importJson">⤒ Import</button><button class="ghost" data-act="exportAll" title="Save all characters in one file (Import reads it back)">⤓ Export all</button><button class="ghost" data-act="groupEdit" data-g="" title="Put characters together in a named group">🗂 New group</button></div></div>
+  ${homeMode() === "cards" ? renderCharCards() : homeMode() === "tiles" ? renderCharTiles() : renderCharGroups()}
   <p class="small muted" style="margin:4px 2px 14px">${S.server ? "Characters are also saved as files in the <b>characters</b> folder on this PC." : "Characters are saved in this app on this device."} To move one to another device: open it → <b>⤓ Export</b>, send the file, then <b>Import</b> it there.</p>
 
   <div class="card" style="margin-top:20px">
@@ -476,7 +484,9 @@ function bAbilities(c, D) {
   ${ABILITIES.map(a => `<tr style="background:var(--${a})"><td><b>${ABILITY_NAMES[a]}</b>${D.startCls && CLASSES[D.startCls].primary.includes(a) ? ' <span class="chip">primary</span>' : ""}</td>
     <td class="num">${pb ? `<button class="small ghost" data-act="pbm" data-a="${a}" data-d="-1" ${c.base[a] <= 8 ? "disabled" : ""}>−</button> <b style="display:inline-block;width:24px">${c.base[a]}</b> <button class="small ghost" data-act="pbm" data-a="${a}" data-d="1" ${c.base[a] >= 15 || (POINT_BUY_COST[c.base[a] + 1] - POINT_BUY_COST[c.base[a]]) > 27 - spent ? "disabled" : ""}>+</button>` : inp("base." + a, c.base[a], { type: "number" })}</td>
     <td class="num">${D.bonus[a] ? sgn(D.bonus[a]) : ""}</td><td class="num big">${D.score[a]}</td><td class="num big">${sgn(D.mod[a])}</td></tr>`).join("")}</table>
-  <p class="small muted">Bonuses come from your background and from Ability Score Improvements / feats chosen when levelling.</p></div>`;
+  <p class="small muted">Bonuses come from your background and from Ability Score Improvements / feats chosen when levelling.</p></div>
+  <div class="card"><h3>Ability used for skills</h3><p class="small muted">Change which ability a skill uses by default — e.g. Strength for Intimidation if your DM allows it. Rolls and the sheet then use that ability.</p>
+    <div class="skabil">${ALL_SKILLS.map(s => `<label class="${(c.skillAbil || {})[s] ? "on" : ""}"><span>${s}</span>${sel(`skillAbil.${s}`, (c.skillAbil || {})[s] || "", ABILITIES.filter(a => a !== SKILLS[s]).map(a => [a, ABILITY_NAMES[a]]), { blank: ABILITY_NAMES[SKILLS[s]] + " (normal)" })}</label>`).join("")}</div></div>`;
 }
 
 function bLevels(c, D) {

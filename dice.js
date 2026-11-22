@@ -67,6 +67,8 @@ const Dice = {
     if (o.kind === "dmg" && !o.parts) this.cur.parts = [{ f: o.formula || "", type: dtKey(o.dtype || "") }];
     (this.cur.riders || []).forEach((r, i) => { if (r.auto) this.addRider(i); });
     // feats that add a die to certain checks (Arcane Eloquence …): pre-selected, can be removed with ✕
+    if (o.kind === "d20" && S.char && !o.suggest) { const m = String(o.title || "").match(/^(.+?) check$/i), D = derive(S.char), a = m && D.skillAdv?.[m[1]];
+      if (a) { this.cur.suggest = "adv"; this.cur.why = a.join(", "); } }
     if (o.kind === "d20" && S.char && typeof checkBonusDice === "function") checkBonusDice(S.char, o.title).forEach(b => this.cur.extras.push({ n: b.n, s: b.s, sign: 1, label: b.label }));
     this.renderAsk();
   },
