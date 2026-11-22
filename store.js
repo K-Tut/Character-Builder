@@ -34,9 +34,15 @@ async function storeSaveChar(c, touch = true) {
   if (touch) Folder.push(c);
   if (touch) Sync.soon();
 }
+// the class with the most levels (for sorting the card view), its subclass and the character level
+function mainClass(c) {
+  const n = {}; (c.levels || []).forEach(l => { n[l.cls] = (n[l.cls] || 0) + 1; });
+  const k = Object.keys(n).sort((a, b) => n[b] - n[a])[0], C = k && CLASSES[k];
+  return { cls: C ? C.name : "", sub: C && c.subclasses?.[k] ? C.subclasses[c.subclasses[k]]?.name || "" : "", multi: Object.keys(n).length > 1, lvl: (c.levels || []).length };
+}
 async function storeListChars() {
   const all = await DB.allChars();
-  return all.sort((a, b) => (b._updated || 0) - (a._updated || 0)).map(c => ({ id: c.id, name: c.name, summary: c._summary || "", thumb: c.thumb || "", group: c.group || "" }));
+  return all.sort((a, b) => (b._updated || 0) - (a._updated || 0)).map(c => ({ id: c.id, name: c.name, summary: c._summary || "", thumb: c.thumb || "", group: c.group || "", portrait: c.portrait || "", ...mainClass(c) }));
 }
 async function storeDeleteChar(id) {
   await DB.delChar(id);

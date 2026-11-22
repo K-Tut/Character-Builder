@@ -509,3 +509,29 @@ body.hasenergy main { padding-left: 46px; }
 
 .chip.tog { cursor: pointer; border: 1px dashed var(--accent); font-weight: 600; }
 .chip.tog.on { border-style: solid; box-shadow: 0 0 0 2px var(--accent-soft); }
+
+/* home: list / cards switch and the card view */
+.viewtog { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-left: 6px; }
+.viewtog button { background: transparent; color: var(--muted); border-radius: 0; padding: 4px 10px; }
+.viewtog button.on { background: var(--accent); color: var(--accent-ink); }
+.ccwrap { position: relative; margin: 0 -4px 10px; }
+.cctrack { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 8px; padding: 6px 8px 16px; -webkit-overflow-scrolling: touch; scrollbar-width: thin; align-items: stretch; }
+.ccdiv { flex: none; display: flex; align-items: flex-end; padding-bottom: 8px; scroll-snap-align: start; }
+.ccdiv span { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-size: 13px; }
+.ccard { flex: none; width: min(68vw, 250px); aspect-ratio: 3 / 4.3; position: relative; border-radius: 14px; overflow: hidden; scroll-snap-align: start; cursor: pointer;
+  background: var(--chip); box-shadow: 0 6px 18px rgba(0,0,0,.35); border: 1px solid var(--line); transition: transform .15s; }
+.ccard:hover { transform: translateY(-3px); }
+.ccard:active { transform: scale(.98); }
+.ccard img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; display: block; }
+.ccph { width: 100%; height: 100%; display: grid; place-items: center; font-size: 64px; opacity: .5; }
+.ccinfo { position: absolute; left: 0; right: 0; bottom: 0; padding: 44px 14px 12px; display: flex; flex-direction: column; gap: 1px; color: #fff;
+  background: linear-gradient(transparent, rgba(0,0,0,.55) 35%, rgba(0,0,0,.85)); text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+.ccinfo b { font-size: 19px; line-height: 1.15; }
+.ccinfo span { font-size: 13.5px; opacity: .92; }
+.ccinfo small { font-size: 12px; opacity: .7; }
+.ccnav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 40px; height: 40px; border-radius: 50%; font-size: 24px; line-height: 1; padding: 0;
+  background: rgba(0,0,0,.55) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.25) !important; }
+.ccnav.prev { left: 2px; } .ccnav.next { right: 2px; }
+@media (hover: none) { .ccnav { display: none; } }
+[data-theme="scifi"] .ccard { border-radius: 2px; border-color: var(--accent); box-shadow: 0 0 14px rgba(63,208,255,.25); clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px)); }
+[data-theme="scifi"] .ccinfo b { font-family: var(--sf-head); letter-spacing: .04em; }

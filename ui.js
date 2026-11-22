@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-21a";
+const APP_VERSION = "2026-11-22a";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -152,6 +152,20 @@ const charCard = c => `<div class="card charcard" data-act="open" data-id="${esc
       ${c.thumb ? `<img src="${c.thumb}">` : `<div class="ph">🛡</div>`}
       <div class="grow"><b>${esc(c.name)}</b><div class="muted small">${esc(c.summary || "")}</div></div>
     </div>`;
+function homeMode() { try { return localStorage.getItem("homeMode") || "list"; } catch (e) { return "list"; } }
+// card view: one big picture card per character, sorted by class and then by name, scrolled sideways
+function renderCharCards() {
+  if (!S.chars.length) return `<p class="muted">No characters yet — create one!</p>`;
+  const list = S.chars.slice().sort((a, b) => (a.cls ? 0 : 1) - (b.cls ? 0 : 1) || (a.cls || "").localeCompare(b.cls || "") || (a.name || "").localeCompare(b.name || ""));
+  let last = null;
+  const cards = list.map(c => {
+    const head = c.cls !== last ? `<div class="ccdiv"><span>${esc(c.cls || "No class yet")}</span></div>` : ""; last = c.cls;
+    const img = c.portrait || c.thumb;
+    return `${head}<div class="ccard" data-act="open" data-id="${esc(c.id)}">${img ? `<img src="${img}" alt="" loading="lazy">` : `<div class="ccph">🛡</div>`}
+      <div class="ccinfo"><b>${esc(c.name || "Unnamed")}</b><span>${esc([c.cls ? c.cls + (c.multi ? " +" : "") : "", c.sub].filter(Boolean).join(" · ") || "—")}</span><small>Level ${c.lvl}${c.group ? " · " + esc(c.group) : ""}</small></div></div>`;
+  }).join("");
+  return `<div class="ccwrap"><button class="ghost ccnav prev" data-act="ccScroll" data-d="-1" aria-label="Back">‹</button><div class="cctrack" id="cctrack">${cards}</div><button class="ghost ccnav next" data-act="ccScroll" data-d="1" aria-label="Forward">›</button></div>`;
+}
 function openGroups() { try { return JSON.parse(localStorage.getItem("openGroups") || "[]"); } catch (e) { return []; } }
 // characters grouped by their "group" name (stored on each character, so it syncs and exports with it)
 function renderCharGroups() {
@@ -171,8 +185,8 @@ function renderHome() {
   const imp = S.ui.import || {}; const st = S.settings || {};
   const syncOn = Sync.enabled();
   return `
-  <div class="card"><div class="row"><h2 style="margin:0">Your characters</h2><button class="right" data-act="new">+ New</button><button class="ghost" data-act="importJson">⤒ Import</button><button class="ghost" data-act="exportAll" title="Save all characters in one file (Import reads it back)">⤓ Export all</button><button class="ghost" data-act="groupEdit" data-g="" title="Put characters together in a named group">🗂 New group</button></div></div>
-  ${renderCharGroups()}
+  <div class="card"><div class="row"><h2 style="margin:0">Your characters</h2><span class="viewtog" title="How to show your characters"><button class="small ${homeMode() === "list" ? "on" : ""}" data-act="homeMode" data-v="list" title="List">☰ List</button><button class="small ${homeMode() === "cards" ? "on" : ""}" data-act="homeMode" data-v="cards" title="Cards">🂠 Cards</button></span><button class="right" data-act="new">+ New</button><button class="ghost" data-act="importJson">⤒ Import</button><button class="ghost" data-act="exportAll" title="Save all characters in one file (Import reads it back)">⤓ Export all</button><button class="ghost" data-act="groupEdit" data-g="" title="Put characters together in a named group">🗂 New group</button></div></div>
+  ${homeMode() === "cards" ? renderCharCards() : renderCharGroups()}
   <p class="small muted" style="margin:4px 2px 14px">${S.server ? "Characters are also saved as files in the <b>characters</b> folder on this PC." : "Characters are saved in this app on this device."} To move one to another device: open it → <b>⤓ Export</b>, send the file, then <b>Import</b> it there.</p>
 
   <div class="card" style="margin-top:20px">

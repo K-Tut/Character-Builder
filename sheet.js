@@ -481,6 +481,8 @@ const ACT = {
   energyTap: () => { S.mtab = "combat"; render(); document.querySelector(".hpbox")?.scrollIntoView({ behavior: "smooth", block: "center" }); },
   new: async () => { S.char = newChar(); await save(true); S.view = "builder"; S.tab = "basics"; render(); },
   open: el => openChar(el.dataset.id),
+  homeMode: el => { try { localStorage.setItem("homeMode", el.dataset.v); } catch (e) { } render(); },
+  ccScroll: el => { const t = document.getElementById("cctrack"); if (t) t.scrollBy({ left: +el.dataset.d * Math.max(200, t.clientWidth * 0.8), behavior: "smooth" }); },
   dsRoll: () => Dice.ask({ kind: "d20", title: "Death saving throw", mod: 0, onDone: applyDeathSave }),
   dsTap: el => { const P = S.char.play, k = el.dataset.k, i = +el.dataset.i; P.ds[k] = P.ds[k] > i ? i : i + 1; save(); render(); },
   spFilter: el => { S.ui.spf = el.dataset.f; render(); },
