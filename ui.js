@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-22b";
+const APP_VERSION = "2026-11-22c";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -171,8 +171,8 @@ function sortedByClass() { return S.chars.slice().sort((a, b) => (a.cls ? 0 : 1)
 function renderCharTiles() {
   if (!S.chars.length) return `<p class="muted">No characters yet — create one!</p>`;
   return `<div class="ctiles">${sortedByClass().map(c => { const img = c.portrait || c.thumb;
-    return `<div class="ctile" data-act="open" data-id="${esc(c.id)}">${img ? `<img src="${img}" alt="" loading="lazy">` : `<div class="ccph">🛡</div>`}
-      <b class="ctname">${esc(c.name || "Unnamed")}</b><span class="ctcls">${esc(c.cls ? c.cls + (c.multi ? " +" : "") : "—")} · ${c.lvl}</span></div>`; }).join("")}</div>`;
+    return `<div class="ctwrap" data-act="open" data-id="${esc(c.id)}"><div class="ctile">${img ? `<img src="${img}" alt="" loading="lazy">` : `<div class="ccph">🛡</div>`}
+      <span class="ctcls">${esc(c.cls ? c.cls + (c.multi ? " +" : "") : "—")} · ${c.lvl}</span></div><b class="ctname">${esc(c.name || "Unnamed")}</b></div>`; }).join("")}</div>`;
 }
 function openGroups() { try { return JSON.parse(localStorage.getItem("openGroups") || "[]"); } catch (e) { return []; } }
 // characters grouped by their "group" name (stored on each character, so it syncs and exports with it)
