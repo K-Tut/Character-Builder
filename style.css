@@ -553,3 +553,20 @@ body.hasenergy main { padding-left: 46px; }
 .ctname { display: block; margin-top: 4px; font-size: 12px; line-height: 1.2; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ctcls { position: absolute; z-index: 1; bottom: 6px; left: 4px; right: 4px; text-align: center; font-size: 10.5px; color: #fff; opacity: .9; text-shadow: 0 1px 2px #000; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 [data-theme="scifi"] .ctile { border-radius: 2px; border-color: rgba(63,208,255,.5); }
+
+/* companions */
+.compbub { position: absolute; left: 5px; bottom: 5px; display: flex; gap: 4px; z-index: 2; }
+.bub { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2px solid #fff; background: var(--chip); display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,.6); cursor: pointer; flex: none; }
+.bub img { width: 100%; height: 100%; object-fit: cover; }
+.bub i { font-style: normal; font-size: 20px; }
+.bub:hover { transform: scale(1.08); }
+.bub.me { border-color: var(--accent); }
+.compph { width: 100%; height: 100%; display: grid; place-items: center; font-size: 56px; opacity: .6; }
+.compimg img { cursor: default; }
+.compform { max-width: 100%; }
+.compline { cursor: pointer; }
+.compline .bub { width: 34px; height: 34px; border-width: 1px; box-shadow: none; }
+.ceatk { flex-wrap: nowrap; gap: 4px; margin-bottom: 4px; }
+.ceatk input { min-width: 0; }
+.ceatk input:nth-child(1) { flex: 2; } .ceatk input:nth-child(2) { width: 54px; flex: none; } .ceatk input:nth-child(3) { flex: 1.2; } .ceatk select { flex: 1; min-width: 0; }
+@media (max-width: 760px) { .bub { width: 34px; height: 34px; } }

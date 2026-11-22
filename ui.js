@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-22e";
+const APP_VERSION = "2026-11-22f";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 

@@ -152,11 +152,13 @@ function readSpAtk() {
 function renderSheet() {
   const c = S.char, D = derive(c), P = c.play;
   if (!D.level) return `<div class="card"><h2>${esc(c.name)}</h2><p>This character has no class levels yet.</p><button data-act="levelup">Choose first class</button> <button class="ghost" data-act="view" data-v="builder">Open builder</button></div>`;
+  if (S.ui.comp && S.ui.comp.id === c.id) { const x = compByKey(c, D, S.ui.comp.key); if (x) return renderCompanion(c, D, x); S.ui.comp = null; }
   const hp = Math.min(P.hp ?? D.hpMax, D.hpMax);
   const pct = Math.max(0, Math.min(100, 100 * hp / D.hpMax));
   const bg = bgData(c);
+  const bubs = compBubbles(c, D);
   const bloodied = isBloodied(c, D);
-  let h = `<div class="card"><div class="hero">${c.portrait || c.thumb ? `<div class="heroimg ${hp <= 0 ? "down" : bloodied ? "bloodied" : ""}"><img src="${c.portrait || c.thumb}" data-act="viewPortrait" title="Show the whole image"></div>` : ""}
+  let h = `<div class="card"><div class="hero">${c.portrait || c.thumb ? `<div class="heroimg ${hp <= 0 ? "down" : bloodied ? "bloodied" : ""}"><img src="${c.portrait || c.thumb}" data-act="viewPortrait" title="Show the whole image">${bubs}</div>` : bubs ? `<div class="heroimg"><div class="compph">🛡</div>${bubs}</div>` : ""}
     <div class="grow herobody"><h2>${esc(c.name)}</h2>
     <div>${esc(classLine(D))}</div><div class="muted small">${esc([D.species ? D.species.name + (c.species.choice ? " (" + c.species.choice + ")" : "") : "", bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div>
     <div class="heroact"><div class="herorow"><button data-act="levelup">⬆ Level up</button><button class="ghost inspbtn2 ${P.inspiration ? "on" : ""}" data-act="insp" title="Heroic Inspiration">${P.inspiration ? "★" : "☆"} Inspiration</button><button class="ghost heroexp" data-act="exportJson" title="Export this character as a file">⤓</button></div>
@@ -200,6 +202,7 @@ function renderSheet() {
   if (D.resources.length) c2 += `<div class="card"><h3>Resources</h3>${D.resources.map(r => `<div class="res"><span class="n"><b class="resname" data-act="resInfo" data-k="${esc(r.key)}" title="Show description">${esc(r.name)} <span class="small muted">ⓘ</span></b>${actTag(resKind(r, featsAll))}${r.die ? ` <span class="chip">${esc(r.die)}</span>` : ""}<div class="small muted">${r.reset === "SR" ? "Short rest" : r.reset === "LR" ? "Long rest" : ""}${r.note ? " · " + esc(r.note) : ""}</div></span>${r.key === "portent" ? portentDice(r, P) : pips(r.key, r.max, P.used[r.key])}</div>${resChildren(r, D, featsAll).map(k => `<div class="reskid" data-act="resKid" data-k="${esc(r.key)}" data-n="${esc(k.name)}"><span class="kidarrow">↳</span><b>${esc(k.name)}</b>${actTag(actKind(k.text))}<span class="small muted">ⓘ</span></div>`).join("")}
     ${r.forms ? `<div class="row small formrow">${(P.active || {})[r.key] ? `<span class="chip acc">Active: ${esc(P.active[r.key])}</span><a href="#" data-act="endForm" data-k="${r.key}">end</a>` : `<span class="muted">Use as:</span>${r.forms.map(f => `<button class="small ghost" data-act="useForm" data-k="${r.key}" data-f="${esc(f)}">${esc(f)}</button>`).join("")}`}</div>` : ""}`).join("")}</div>`;
   if (D.slots.length || D.pact || D.spellPoints) c2 += `<div class="card"><h3>${D.spellPoints ? "Spell points" : "Spell slots"}</h3>${slotRows(D, P)}</div>`;
+  c2 += companionCard(c, D);
   const tg = playToggles(D);
   c2 += `<div class="card"><h3>Conditions</h3>${tg.length ? `<div style="margin-bottom:6px">${tg.map(t => { const on = P.conditions.includes(t.name), r = D.resources.find(x => x.key === t.res), left = r ? r.max - (P.used[t.res] || 0) : 0;
       return `<span class="chip tog ${on ? "acc on" : ""}" data-act="playTog" data-v="${esc(t.name)}" data-r="${t.res || ""}">⚡ ${esc(t.name)} ${on ? "· ON" : r ? `· ${left} left` : ""}</span>`; }).join("")}</div>` : ""}<div>${CONDITIONS.map(x => `<span class="chip ${P.conditions.includes(x) ? "acc" : ""}" style="cursor:pointer" data-act="cond" data-v="${x}">${x}</span>`).join("")}</div>
@@ -272,7 +275,7 @@ function renderModalInner() {
   if (!S.modal) { bg.classList.add("hidden"); return; }
   bg.classList.remove("hidden");
   const st = box.scrollTop;
-  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, longRest: mLongRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin, group: mGroup, spellEdit: mSpellEdit }[S.modal.type]();
+  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, longRest: mLongRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin, group: mGroup, spellEdit: mSpellEdit, compEdit: mCompEdit }[S.modal.type]();
   box.scrollTop = st;
 }
 
@@ -711,7 +714,7 @@ const ACT = {
   }
 };
 // change-type actions (inputs/selects/checkboxes)
-Object.assign(ACT, SPELL_ACT);
+Object.assign(ACT, SPELL_ACT, COMP_ACT);
 const CHG = {
   spMode: el => { S.char.spellPoints = el.value === "points"; },
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },
@@ -746,6 +749,7 @@ const CHG = {
   },
   popt: el => { const o = S.ui.print; o[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value; }
 };
+Object.assign(CHG, COMP_CHG);
 
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el) return;
