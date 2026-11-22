@@ -96,7 +96,8 @@ function companionList(c, D) {
     const st = (c.comps ||= {})[k] ||= {};
     if (T.forms && !st.form) st.form = k === "familiar" ? (D.subs.wizard && /necroman/i.test(D.subs.wizard.name) ? "Skeleton (Pact of the Chain / Necromancer)" : "Owl") : T.forms[0];
     const s = { ...T.stat(c, D, st), ...(st.edit || {}) };
-    out.push({ key: k, label: T.label, icon: T.icon, forms: T.forms, st, s, name: st.name || (k === "familiar" || k === "primal" ? st.form.replace(/ \(.*\)$/, "") : T.label) });
+    const icon = k === "familiar" && /Skeleton|Zombie/.test(st.form) ? "💀" : k === "steed" && /Undead/.test(st.form) ? "💀" : T.icon;
+    out.push({ key: k, label: T.label, icon, forms: T.forms, st, s, name: st.name || (k === "familiar" || k === "primal" ? st.form.replace(/ \(.*\)$/, "") : T.label) });
   }
   (c.ownComps || []).forEach(o => out.push({ key: "own:" + o.id, label: "Own companion", icon: "🐾", st: o, s: o.stat || {}, name: o.name || "Companion", own: true }));
   return out;
@@ -114,6 +115,22 @@ function companionCard(c, D) {
   return `<div class="card"><h3>Companions</h3>${list.map(x => { const max = Math.max(1, +x.s.hpMax || 1), hp = Math.min(x.st.hp ?? max, max);
       return `<div class="res compline" data-act="compShow" data-k="${esc(x.key)}"><span class="n row" style="gap:8px;flex-wrap:nowrap"><span class="bub">${x.st.img ? `<img src="${x.st.img}" alt="">` : `<i>${x.icon}</i>`}</span><span><b>${esc(x.name)}</b><div class="small muted">${esc(x.label)} · AC ${+x.s.ac || 10}</div></span></span><span class="small"><b>${hp}</b> / ${max} HP ›</span></div>`; }).join("")}
     <div class="row" style="margin-top:8px"><button class="small ghost" data-act="compAdd">＋ Own companion</button><span class="small muted">${list.length ? "Tap one to open its sheet." : "Companions from your class, subclass or spells (Find Familiar, Find Steed …) appear here by themselves."}</span></div></div>`;
+}
+// "(3/day)", "(1/long rest)", "2/Day" … in a trait's name or text -> a use counter
+function traitUses(n, t) { const m = (n + " " + t).match(/\b(\d+)\s*\/\s*(day|long rest|short rest)/i); return m ? { max: +m[1], sr: /short/i.test(m[2]) } : null; }
+function traitsCard(x) {
+  const s = x.s, st = x.st, rows = (s.traits || []).concat(s.text || []);
+  const body = rows.map(([n, t]) => { const u = traitUses(n, t), used = (st.used || {})[n] || 0;
+    const pipsH = u ? `<span class="pips">${Array.from({ length: u.max }, (_, i) => `<span class="pip ${i < u.max - used ? "" : "used"}" data-act="compPip" data-k="${esc(x.key)}" data-n="${esc(n)}" data-i="${i}" data-m="${u.max}"></span>`).join("")}</span>` : "";
+    return `<div class="feat ctrait"><div class="h"><b>${esc(n)}</b>${actTag(actKind(t))}<span class="grow"></span>${pipsH}</div><div class="desc small">${diceLinks(para(t), n)}</div></div>`; }).join("");
+  return `<div class="card"><h3>Traits & actions</h3>${body || '<p class="muted small">—</p>'}
+    ${st.notes ? `<h3 style="margin-top:12px">Notes</h3><div class="desc">${para(st.notes)}</div>` : ""}
+    <p class="small muted" style="margin-top:10px">${x.own ? "Your own companion — change anything with ✎ Edit." : "Stats scale with your level and modifiers. Check them against your book; anything can be changed with ✎ Edit."}</p></div>`;
+}
+// rests refill the companions' uses (and a long rest their HP)
+function restCompanions(c, long) {
+  const all = Object.values(c.comps || {}).concat(c.ownComps || []);
+  for (const st of all) { if (long) { st.used = {}; st.hp = undefined; st.temp = 0; } else if (st.used) for (const n in st.used) if (/short/i.test(n)) delete st.used[n]; }
 }
 function renderCompanion(c, D, x) {
   const s = x.s, st = x.st, hpMax = Math.max(1, +s.hpMax || 1), hp = Math.min(st.hp ?? hpMax, hpMax), pct = Math.max(0, 100 * hp / hpMax), ab = s.ab || abl([10, 10, 10, 10, 10, 10]);
@@ -134,13 +151,11 @@ function renderCompanion(c, D, x) {
       <div class="hpbar"><div style="width:${pct}%;background:${pct < 30 ? "#b33" : pct < 60 ? "var(--warn)" : "var(--good)"}"></div></div>
       <div class="row"><input id="compAmt" type="number" min="0" placeholder="amount" style="width:90px"><button class="danger" data-act="compHp" data-k="${esc(x.key)}" data-m="dmg">Damage</button><button style="background:var(--good)" data-act="compHp" data-k="${esc(x.key)}" data-m="heal">Heal</button><button class="ghost" data-act="compHp" data-k="${esc(x.key)}" data-m="full">Full</button></div></div>
     <div class="card"><h3>Attacks</h3>${acts ? `<table class="t"><tr><th>Attack</th><th class="num">Hit</th><th>Damage</th></tr>${acts}</table><p class="small muted">🎲 Tap the hit bonus to attack — on a hit tap “Hit” to roll damage.</p>` : '<p class="muted small">No attacks.</p>'}</div>
+    ${traitsCard(x)}
     <div class="card"><h3>Conditions</h3><div>${CONDITIONS.map(k => `<span class="chip ${(st.cond || []).includes(k) ? "acc" : ""}" style="cursor:pointer" data-act="compCond" data-k="${esc(x.key)}" data-v="${k}">${k}</span>`).join("")}</div></div>`;
-  const c3 = `<div class="card"><h3>Traits & actions</h3>${(s.traits || []).concat(s.text || []).map(([n, t]) => `<div class="feat"><div class="h"><b>${esc(n)}</b>${actTag(actKind(t))}</div><div class="desc small">${diceLinks(para(t), n)}</div></div>`).join("") || '<p class="muted small">—</p>'}
-      ${st.notes ? `<h3 style="margin-top:12px">Notes</h3><div class="desc">${para(st.notes)}</div>` : ""}
-      <p class="small muted" style="margin-top:10px">${x.own ? "Your own companion — change anything with ✎ Edit." : "Stats scale with your level and modifiers. Check them against your book; anything can be changed with ✎ Edit."}</p></div>`;
-  const mt = ["combat", "stats", "features"].includes(S.mtab) ? S.mtab : "combat";
-  const mnav = `<nav class="mnav">${[["combat", "❤", "Combat"], ["stats", "◆", "Stats"], ["features", "★", "Traits"]].map(([k, i, l]) => `<button class="${mt === k ? "on" : ""}" data-act="mtab" data-k="${k}"><span>${i}</span>${l}</button>`).join("")}<button data-act="compShow" data-k=""><span>↩</span>${esc((c.name || "").split(/[ ,]/)[0])}</button></nav>`;
-  return h + `<div class="sheet m-${mt === "features" ? "col3" : mt}"><div class="col1">${c1}</div><div class="col2">${c2}</div><div class="col3">${c3}</div></div>${mnav}`;
+  const mt = ["combat", "stats"].includes(S.mtab) ? S.mtab : "combat";
+  const mnav = `<nav class="mnav">${[["combat", "❤", "Combat"], ["stats", "◆", "Stats"]].map(([k, i, l]) => `<button class="${mt === k ? "on" : ""}" data-act="mtab" data-k="${k}"><span>${i}</span>${l}</button>`).join("")}<button data-act="compShow" data-k=""><span>↩</span>${esc((c.name || "").split(/[ ,]/)[0])}</button></nav>`;
+  return h + `<div class="sheet compsheet m-${mt}"><div class="col1">${c1}</div><div class="col2">${c2}</div></div>${mnav}`;
 }
 
 // edit form: name, picture, notes, and overrides of the numbers (own companions: everything)
@@ -194,6 +209,8 @@ const COMP_ACT = {
     else if (el.dataset.m === "heal") hp = Math.min(max, hp + n);
     else { let d = n; const t = +st.temp || 0; if (t) { const u = Math.min(t, d); st.temp = t - u; d -= u; } hp = Math.max(0, hp - d); }
     st.hp = hp; save(); render(); },
+  compPip: el => { const c = S.char, x = compByKey(c, derive(c), el.dataset.k); if (!x) return; const u = x.st.used ||= {}, n = el.dataset.n, i = +el.dataset.i, m = +el.dataset.m, rem = m - (u[n] || 0);
+    const nrem = Math.max(0, Math.min(m, i < rem ? rem - 1 : rem + 1)); u[n] = m - nrem; save(); render(); },
   compCond: el => { const c = S.char, x = compByKey(c, derive(c), el.dataset.k); if (!x) return; const a = x.st.cond ||= [], v = el.dataset.v, i = a.indexOf(v); i >= 0 ? a.splice(i, 1) : a.push(v); save(); render(); }
 };
 const COMP_CHG = {

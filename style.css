@@ -570,3 +570,8 @@ body.hasenergy main { padding-left: 46px; }
 .ceatk input { min-width: 0; }
 .ceatk input:nth-child(1) { flex: 2; } .ceatk input:nth-child(2) { width: 54px; flex: none; } .ceatk input:nth-child(3) { flex: 1.2; } .ceatk select { flex: 1; min-width: 0; }
 @media (max-width: 760px) { .bub { width: 34px; height: 34px; } }
+
+.compsheet { grid-template-columns: 280px minmax(0, 1fr); }
+@media (max-width: 760px) { .compsheet { grid-template-columns: 1fr; } }
+.ctrait .h { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.herorow .compform { flex: 1 1 0; min-width: 0; }

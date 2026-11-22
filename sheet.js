@@ -615,6 +615,7 @@ const ACT = {
     const P = S.char.play, D = derive(S.char);
     Object.assign(P, { hp: D.hpMax, temp: 0, used: {}, slots: {}, pact: 0, hd: {}, ds: { s: 0, f: 0 }, active: {}, exhaustion: Math.max(0, (+P.exhaustion || 0) - 1) });
     P.conditions = P.conditions.filter(x => x !== "Raging" && x !== "Concentrating" && !playToggles(D).some(t => t.name === x));
+    restCompanions(S.char, true);
     const tmp = Math.max(0, ...(D.restChoices || []).map(r => r.pick && r.ch.lrTemp?.[r.pick] ? r.ch.lrTemp[r.pick](D.cls[r.cls], D) : 0)); if (tmp) P.temp = tmp;
     const pr = rollPortent(D);
     save(); render(); toast("Long rest complete" + (pr ? " · Portent: " + pr : ""));
@@ -630,7 +631,7 @@ const ACT = {
   srFinish: () => {
     const c = S.char, D = derive(c);
     D.resources.forEach(r => { if (r.reset === "SR") c.play.used[r.key] = 0; else if (r.note.startsWith("regain 1")) c.play.used[r.key] = Math.max(0, (c.play.used[r.key] || 0) - 1); });
-    c.play.pact = 0; closeModal(); save(); render(); toast("Short rest complete");
+    c.play.pact = 0; restCompanions(c, false); closeModal(); save(); render(); toast("Short rest complete");
   },
   modalClose: () => { closeModal(); render(); },
   luClass: el => { const lv = S.draft.levels[S.draft.levels.length - 1]; if (lv.cls !== el.dataset.k) { lv.cls = el.dataset.k; lv.hp = null; lv.asi = null; S.draft.subclasses = clone(S.char.subclasses); S.draft.pools = clone(S.char.pools); } renderModal(); },
