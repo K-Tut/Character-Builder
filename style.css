@@ -575,3 +575,15 @@ body.hasenergy main { padding-left: 46px; }
 @media (max-width: 760px) { .compsheet { grid-template-columns: 1fr; } }
 .ctrait .h { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .herorow .compform { flex: 1 1 0; min-width: 0; }
+
+/* active spells */
+.buffbar { display: grid; gap: 6px; margin: -6px 0 14px; }
+.buff { display: flex; gap: 10px; align-items: flex-start; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,200,80,.45);
+  background: linear-gradient(90deg, rgba(255,190,60,.14), rgba(255,190,60,.04)); box-shadow: 0 0 14px rgba(255,190,60,.12); }
+.buff .bicon { font-size: 20px; animation: bspark 2.4s ease-in-out infinite; }
+@keyframes bspark { 50% { transform: scale(1.18) rotate(12deg); filter: drop-shadow(0 0 6px #ffd36b); } }
+.buffed { position: relative; color: #ffd36b !important; text-shadow: 0 0 8px rgba(255,200,80,.8); animation: bglow 2.2s ease-in-out infinite; border-color: rgba(255,200,80,.7) !important; }
+.stat.buffed { box-shadow: 0 0 0 1px rgba(255,200,80,.6), 0 0 16px rgba(255,190,60,.35); }
+.stat.buffed .v, .stat.buffed .k { color: #ffd36b; }
+@keyframes bglow { 50% { text-shadow: 0 0 14px rgba(255,210,90,1), 0 0 3px rgba(255,255,255,.6); } }
+.buffplus { font-size: 11px; color: #ffd36b; font-weight: 700; }

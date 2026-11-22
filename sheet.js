@@ -86,6 +86,11 @@ function stripOptions(txt, kids) {
   const names = kids.map(k => k.name.toLowerCase());
   return String(txt || "").split("\n").filter(l => { const t = l.trim().toLowerCase(); return !names.some(n => t.startsWith(n + ".") || t.startsWith(n + ":") || t.startsWith(n + " (")); }).join("\n");
 }
+function castButtons(name, l, c, D) {
+  if (!buffInfo(name)) return "";
+  const comps = companionList(c, D); l = isNaN(+l) ? ((c.spells || []).find(x => x.name === name)?.level ?? 1) : +l;
+  return `<div class="row" style="margin-bottom:8px"><button class="small" data-act="castOpen" data-n="${esc(name)}" data-l="${+l || 0}" data-t="self">✨ Cast on yourself</button>${comps.length ? `<button class="small ghost" data-act="castOpen" data-n="${esc(name)}" data-l="${+l || 0}" data-t="${esc(comps[0].key)}">✨ Cast on ${esc(comps.length > 1 ? "a companion" : comps[0].name)}</button>` : ""}</div>`;
+}
 function isBloodied(c, D) { const hp = c.play?.hp ?? D.hpMax; return hp > 0 && hp <= Math.floor(D.hpMax / 2); }
 // reasons the character has Advantage on attack rolls right now
 function advantageHints(c, D) {
@@ -110,6 +115,7 @@ function damageRiders(c, D, a) {
   if (W && (c.play.conditions || []).includes("Giant's Might")) { const fl = D.cls.fighter || 0; out.push({ name: "Giant's Might", n: 1, s: fl >= 18 ? 10 : fl >= 10 ? 8 : 6, type: T, note: "once per turn", auto: true }); }
   if (W && a.heavy && D.feats.some(f => f.name === "Great Weapon Master")) out.push({ name: "Great Weapon Master", flat: D.pb, type: T });
   if (D.subs.warlock && /hexblade/i.test(D.subs.warlock.name)) out.push({ name: "Hexblade's Curse", flat: D.pb, type: T, note: "cursed target" });
+  buffRiders(c, D, a, out);
   return out;
 }
 function spellAttackPrefill(name, D) {
@@ -163,6 +169,7 @@ function renderSheet() {
     <div>${esc(classLine(D))}</div><div class="muted small">${esc([D.species ? D.species.name + (c.species.choice ? " (" + c.species.choice + ")" : "") : "", bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div>
     <div class="heroact"><div class="herorow"><button data-act="levelup">⬆ Level up</button><button class="ghost inspbtn2 ${P.inspiration ? "on" : ""}" data-act="insp" title="Heroic Inspiration">${P.inspiration ? "★" : "☆"} Inspiration</button><button class="ghost heroexp" data-act="exportJson" title="Export this character as a file">⤓</button></div>
       <div class="herorow"><button class="ghost" data-act="shortRest">☕ Short rest</button><button class="ghost" data-act="longRest">🌙 Long rest</button></div></div></div></div></div>`;
+  h += buffBanner(c, "self");
 
   // column 1: abilities & skills
   let c1 = `<div class="card"><h3>Abilities</h3><div class="abil small muted"><span></span><span class="num">Score</span><span class="num">Mod</span><span class="num">Save</span></div>
@@ -175,12 +182,12 @@ function renderSheet() {
   // column 2: combat
   const exh = +P.exhaustion || 0;
   let c2 = `<div class="card"><div class="stats">
-    <div class="stat"><div class="v">${D.ac}</div><div class="k">Armor Class</div></div><div class="stat roll" ${R("Initiative", D.init)}><div class="v">${sgn(D.init)}</div><div class="k">Initiative 🎲</div></div>
-    <div class="stat"><div class="v">${D.speed}</div><div class="k">Speed ft</div></div><div class="stat"><div class="v">${sgn(D.pb)}</div><div class="k">Prof. Bonus</div></div></div>
+    <div class="stat${glowIf(D.buffed.ac)}"><div class="v">${D.ac}</div><div class="k">Armor Class</div></div><div class="stat roll" ${R("Initiative", D.init)}><div class="v">${sgn(D.init)}</div><div class="k">Initiative 🎲</div></div>
+    <div class="stat${glowIf(D.buffed.speed)}"><div class="v">${D.speed}</div><div class="k">Speed ft</div></div><div class="stat"><div class="v">${sgn(D.pb)}</div><div class="k">Prof. Bonus</div></div></div>
     <p class="small muted" style="margin:8px 0 0">${D.size}${D.darkvision ? " · Darkvision " + D.darkvision + " ft" : ""}${D.resist.length ? " · Resistances: " + esc(D.resist.join(", ")) : ""}</p></div>
   <div class="card"><h3>Hit Points</h3>
     <div class="hpbox"><div><div class="small muted">Current</div><input type="number" data-path="play.hp" data-num value="${hp}"></div>
-    <div><div class="small muted">Max</div><div class="big" style="font-size:26px;padding-top:4px">${D.hpMax}</div></div>
+    <div><div class="small muted">Max</div><div class="big${glowIf(D.buffed.hp)}" style="font-size:26px;padding-top:4px">${D.hpMax}</div></div>
     <div><div class="small muted">Temp</div><input type="number" data-path="play.temp" data-num value="${+P.temp || 0}"></div></div>
     <div class="hpbar"><div style="width:${pct}%;background:${pct < 30 ? "#b33" : pct < 60 ? "var(--warn)" : "var(--good)"}"></div></div>
     <div class="row"><input id="hpAmt" type="number" min="0" placeholder="amount" style="width:90px"><button class="danger" data-act="hp" data-m="dmg">Damage</button><button style="background:var(--good)" data-act="hp" data-m="heal">Heal</button><button class="ghost" data-act="hp" data-m="temp">Set temp</button></div>
@@ -191,7 +198,7 @@ function renderSheet() {
   </div>
   <div class="card"><div class="row"><h3 style="margin:0">Attacks</h3><span class="right row" style="gap:6px"><button class="small ghost" data-act="wpnNew" title="Add a weapon (also goes into your equipment)">＋ Weapon</button><button class="small ghost" data-act="spAtkNew" title="Add an attack from one of your spells">＋ Spell attack</button></span></div>
     ${S.ui.wpnAdd ? `<div class="row small addwpn"><select id="addw2">${WEAPONS.map(w => `<option>${w.name}</option>`).join("")}</select><label>Magic +<select id="addw2m">${[0, 1, 2, 3].map(n => `<option>${n}</option>`).join("")}</select></label><button class="small" data-act="wpnAdd">Add</button><a href="#" data-act="wpnNew">cancel</a></div>` : ""}
-    ${D.attacks.length || D.spellAttacks.length ? `<table class="t"><tr><th>Attack</th><th class="num">Hit / DC</th><th>Damage</th></tr>${D.attacks.map((a, i) => `<tr><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.baseProps)}${a.mastery ? ` <span class="chip acc mastchip" data-act="mastInfo" data-i="${i}" title="What does ${esc(a.mastery)} do?">Mastery: ${esc(a.mastery)} ${(S.ui.mastOpen || {})[i] ? "▾" : "ⓘ"}</span>` : ""}${a.notes ? " · " + esc(a.notes) : ""}</div></td><td class="num big roll" style="font-size:17px" ${ATK("w" + i, "hit")}>${sgn(a.hit)}</td><td class="roll" ${ATK("w" + i, "dmg")}>${a.parts.map(partText).join(" + ")}</td></tr>
+    ${D.attacks.length || D.spellAttacks.length ? `<table class="t"><tr><th>Attack</th><th class="num">Hit / DC</th><th>Damage</th></tr>${D.attacks.map((a, i) => `<tr><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.baseProps)}${a.mastery ? ` <span class="chip acc mastchip" data-act="mastInfo" data-i="${i}" title="What does ${esc(a.mastery)} do?">Mastery: ${esc(a.mastery)} ${(S.ui.mastOpen || {})[i] ? "▾" : "ⓘ"}</span>` : ""}${a.notes ? " · " + esc(a.notes) : ""}</div></td><td class="num big roll${glowIf(a.buffHit)}" style="font-size:17px" ${ATK("w" + i, "hit")}>${sgn(a.hit)}</td><td class="roll${glowIf(D.buffed.dmg)}" ${ATK("w" + i, "dmg")}>${a.parts.map(partText).join(" + ")}${D.buffed.dmg ? ` <span class="buffplus">+ ${esc(D.buffed.dmg.join(", "))}</span>` : ""}</td></tr>
       ${a.mastery && (S.ui.mastOpen || {})[i] ? `<tr class="mastrow"><td colspan="3"><div class="desc small">${masteryText(a, D)}</div></td></tr>` : ""}`).join("")}
       ${D.spellAttacks.map((a, i) => `<tr><td><b>${esc(a.name)}</b> <a href="#" class="small" data-act="spAtkEdit" data-i="${i}" title="Edit">✎</a><div class="small muted">Spell${a.mode === "save" ? " · " + ABILITY_NAMES[a.save] + " save" : ""}${a.note ? " · 📝 " + esc(a.note) : ""}</div></td>
         ${a.mode === "save" ? `<td class="num" style="font-size:15px"><b>DC ${a.dc}</b><div class="small muted">${ABBR[a.save]}</div></td>` : `<td class="num big roll" style="font-size:17px" ${ATK("s" + i, "hit")}>${sgn(a.hit)}</td>`}
@@ -261,7 +268,7 @@ function sheetSpells(c, D) {
   for (const l of Object.keys(groups).sort((a, b) => (a === "?" ? 99 : a) - (b === "?" ? 99 : b))) {
     h += `<h3 style="margin-top:12px">${l === "?" ? "Other spells" : +l ? "Level " + l : "Cantrips"}</h3>`;
     h += groups[l].sort((a, b) => a.name.localeCompare(b.name)).map(s => `<div class="spell"><div class="h" data-act="toggleOpen"><b style="flex:1">${esc(s.name)}</b>${s.si?.school ? `<span class="tag school">${esc(s.si.school)}</span>` : ""}${s.si?.conc ? '<span class="tag">C</span>' : ""}${s.si?.ritual ? '<span class="tag">R</span>' : ""}${actTag(actKind("", s.si?.time))}<span class="muted small">${esc(s.si?.time || "")}${s.si?.range ? " · " + esc(s.si.range) : ""}</span><span class="tag">${esc(s.src)}${s.always ? " ★" : ""}</span>${freePips(s.name, D, c)}</div>
-      <div class="body hidden">${+l ? freeToggle(s.name, D, c) : ""}${s.si ? `<div class="meta">${esc([s.si.time && "Casting time: " + s.si.time, s.si.range && "Range: " + s.si.range, s.si.comp && "Components: " + s.si.comp, s.si.dur && "Duration: " + s.si.dur].filter(Boolean).join(" · "))}</div><div class="desc">${diceLinks(para(s.si.text), s.name)}</div>` : '<span class="muted small">No description imported.</span>'}</div></div>`).join("");
+      <div class="body hidden">${castButtons(s.name, l, c, D)}${+l ? freeToggle(s.name, D, c) : ""}${s.si ? `<div class="meta">${esc([s.si.time && "Casting time: " + s.si.time, s.si.range && "Range: " + s.si.range, s.si.comp && "Components: " + s.si.comp, s.si.dur && "Duration: " + s.si.dur].filter(Boolean).join(" · "))}</div><div class="desc">${diceLinks(para(s.si.text), s.name)}</div>` : '<span class="muted small">No description imported.</span>'}</div></div>`).join("");
   }
   return h;
 }
@@ -275,7 +282,7 @@ function renderModalInner() {
   if (!S.modal) { bg.classList.add("hidden"); return; }
   bg.classList.remove("hidden");
   const st = box.scrollTop;
-  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, longRest: mLongRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin, group: mGroup, spellEdit: mSpellEdit, compEdit: mCompEdit }[S.modal.type]();
+  box.innerHTML = { levelup: mLevelUp, feature: mFeature, shortRest: mShortRest, longRest: mLongRest, shop: () => mShop(), info: mInfo, image: mImage, crop: mCrop, spellAtk: mSpellAtk, dmloot: mDmLoot, party: mParty, join: mJoin, group: mGroup, spellEdit: mSpellEdit, compEdit: mCompEdit, cast: mCast }[S.modal.type]();
   box.scrollTop = st;
 }
 
@@ -615,7 +622,7 @@ const ACT = {
     const P = S.char.play, D = derive(S.char);
     Object.assign(P, { hp: D.hpMax, temp: 0, used: {}, slots: {}, pact: 0, hd: {}, ds: { s: 0, f: 0 }, active: {}, exhaustion: Math.max(0, (+P.exhaustion || 0) - 1) });
     P.conditions = P.conditions.filter(x => x !== "Raging" && x !== "Concentrating" && !playToggles(D).some(t => t.name === x));
-    restCompanions(S.char, true);
+    restCompanions(S.char, true); restBuffs(S.char, true);
     const tmp = Math.max(0, ...(D.restChoices || []).map(r => r.pick && r.ch.lrTemp?.[r.pick] ? r.ch.lrTemp[r.pick](D.cls[r.cls], D) : 0)); if (tmp) P.temp = tmp;
     const pr = rollPortent(D);
     save(); render(); toast("Long rest complete" + (pr ? " · Portent: " + pr : ""));
@@ -631,7 +638,7 @@ const ACT = {
   srFinish: () => {
     const c = S.char, D = derive(c);
     D.resources.forEach(r => { if (r.reset === "SR") c.play.used[r.key] = 0; else if (r.note.startsWith("regain 1")) c.play.used[r.key] = Math.max(0, (c.play.used[r.key] || 0) - 1); });
-    c.play.pact = 0; restCompanions(c, false); closeModal(); save(); render(); toast("Short rest complete");
+    c.play.pact = 0; restCompanions(c, false); restBuffs(c, false); closeModal(); save(); render(); toast("Short rest complete");
   },
   modalClose: () => { closeModal(); render(); },
   luClass: el => { const lv = S.draft.levels[S.draft.levels.length - 1]; if (lv.cls !== el.dataset.k) { lv.cls = el.dataset.k; lv.hp = null; lv.asi = null; S.draft.subclasses = clone(S.char.subclasses); S.draft.pools = clone(S.char.pools); } renderModal(); },
@@ -715,7 +722,7 @@ const ACT = {
   }
 };
 // change-type actions (inputs/selects/checkboxes)
-Object.assign(ACT, SPELL_ACT, COMP_ACT);
+Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT);
 const CHG = {
   spMode: el => { S.char.spellPoints = el.value === "points"; },
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },
@@ -750,7 +757,7 @@ const CHG = {
   },
   popt: el => { const o = S.ui.print; o[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value; }
 };
-Object.assign(CHG, COMP_CHG);
+Object.assign(CHG, COMP_CHG, BUFF_CHG);
 
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el) return;

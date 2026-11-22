@@ -98,11 +98,11 @@ function companionList(c, D) {
   for (const [k, T] of Object.entries(COMP_TEMPLATES)) if (T.has(c, D)) {
     const st = (c.comps ||= {})[k] ||= {};
     if (T.forms && !st.form) st.form = k === "familiar" ? (D.subs.wizard && /necroman/i.test(D.subs.wizard.name) ? "Skeleton (Pact of the Chain / Necromancer)" : "Owl") : T.forms[0];
-    const s = { ...T.stat(c, D, st), ...(st.edit || {}) };
+    const s = applyBuffsComp(c, k, { ...T.stat(c, D, st), ...(st.edit || {}) });
     const icon = k === "familiar" && /Skeleton|Zombie/.test(st.form) ? "💀" : k === "steed" && /Undead/.test(st.form) ? "💀" : T.icon;
     out.push({ key: k, label: T.label, icon, forms: T.forms, st, s, name: st.name || (k === "familiar" || k === "primal" ? st.form.replace(/ \(.*\)$/, "") : T.label) });
   }
-  (c.ownComps || []).forEach(o => out.push({ key: "own:" + o.id, label: "Own companion", icon: "🐾", st: o, s: o.stat || {}, name: o.name || "Companion", own: true }));
+  (c.ownComps || []).forEach(o => out.push({ key: "own:" + o.id, label: "Own companion", icon: "🐾", st: o, s: applyBuffsComp(c, "own:" + o.id, o.stat || {}), name: o.name || "Companion", own: true }));
   return out;
 }
 function compByKey(c, D, k) { return companionList(c, D).find(x => x.key === k); }
@@ -153,6 +153,7 @@ function renderCompanion(c, D, x) {
       <div class="muted small">${esc(c.name)}'s companion</div>
       <div class="heroact"><div class="herorow">${x.forms ? `<select data-act="compForm" data-k="${esc(x.key)}" class="compform">${x.forms.map(f => `<option ${f === st.form ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>` : ""}${x.key === "steed" ? `<select data-act="compSlot" title="Spell slot level">${[2, 3, 4, 5, 6, 7, 8, 9].map(l => `<option value="${l}" ${l === (+st.slot || 2) ? "selected" : ""}>Level ${l} slot</option>`).join("")}</select>` : ""}<button class="ghost" data-act="compEdit" data-k="${esc(x.key)}">✎ Edit</button></div>
         <div class="herorow"><button class="ghost" data-act="compShow" data-k="">◀ Back to ${esc(c.name)}</button></div></div></div></div></div>`;
+  const hb = buffBanner(c, x.key);
   const cb = +s.checkBonus || 0, sk = typeof s.skills === "object" && s.skills ? s.skills : parseSkills(s.skills);
   const c1 = `<div class="card"><h3>Abilities</h3>${AB6.map(a => { const m = cmod(+ab[a] || 10) + cb, sv = s.saves?.[a] ?? m; return `<div class="abil" style="background:var(--${a})"><b>${ABILITY_NAMES[a]}</b><span class="num">${+ab[a] || 10}</span><span class="m roll" ${R(x.name + ": " + ABILITY_NAMES[a] + " check", m)}>${sgn(m)}</span><span class="roll" ${R(x.name + ": " + ABILITY_NAMES[a] + " save", sv)}>${sgn(sv)}</span></div>`; }).join("")}
       <p class="small muted" style="margin:6px 0 0">Tap a modifier to roll a check, the last column for a save.</p></div>
@@ -160,10 +161,10 @@ function renderCompanion(c, D, x) {
       return `<div class="skill roll" style="background:var(--${a})" ${R(x.name + ": " + n + " check", v)}><span><span class="dot ${own ? "p" : ""}"></span>${n} <span class="muted small">${ABBR[a]}</span></span><b>${sgn(v)}</b></div>`; }).join("")}
       <p class="small muted" style="margin:6px 0 0">● = listed in its stat block; the rest come from its ability scores${cb ? ` (+${cb} from its bond)` : ""}.</p></div>
     <div class="card"><h3>Senses & more</h3><p class="small" style="margin:0">${[s.senses && "<b>Senses:</b> " + esc(s.senses), s.extra && esc(s.extra)].filter(Boolean).join("<br>") || '<span class="muted">—</span>'}</p></div>`;
-  const acts = (s.actions || []).map((a, i) => `<tr><td><b>${esc(a.name)}</b>${a.note ? `<div class="small muted">${esc(a.note)}</div>` : ""}</td><td class="num"><span class="hitbtn2 roll" data-act="compAtk" data-k="${esc(x.key)}" data-i="${i}" data-m="hit">${sgn(+a.hit || 0)}</span></td>
+  const acts = (s.actions || []).map((a, i) => `<tr><td><b>${esc(a.name)}</b>${a.note ? `<div class="small muted">${esc(a.note)}</div>` : ""}</td><td class="num${glowIf(a.buffed)}"><span class="hitbtn2 roll" data-act="compAtk" data-k="${esc(x.key)}" data-i="${i}" data-m="hit">${sgn(+a.hit || 0)}</span></td>
       <td><span class="roll" data-act="compAtk" data-k="${esc(x.key)}" data-i="${i}" data-m="dmg">${(a.parts || []).map(p => esc(p.f) + (p.type ? " " + dtIcon(p.type, "inl") : "")).join(" + ")}</span></td></tr>`).join("");
-  const c2 = `<div class="card"><div class="stats"><div class="stat"><div class="v">${+s.ac || 10}</div><div class="k">Armor Class</div></div><div class="stat roll" ${R(x.name + ": Initiative", cmod(+ab.dex || 10))}><div class="v">${sgn(cmod(+ab.dex || 10))}</div><div class="k">Initiative 🎲</div></div><div class="stat" style="grid-column:span 2"><div class="v" style="font-size:15px">${esc(s.speed || "—")}</div><div class="k">Speed</div></div></div></div>
-    <div class="card"><h3>Hit points</h3><div class="hpbox"><div><div class="small muted">Current</div><input type="number" value="${hp}" data-act="compHpSet" data-k="${esc(x.key)}"></div><div><div class="small muted">Max</div><div class="big" style="font-size:26px;padding-top:4px">${hpMax}</div></div><div><div class="small muted">Temp</div><input type="number" value="${+st.temp || 0}" data-act="compTempSet" data-k="${esc(x.key)}"></div></div>
+  const c2 = `<div class="card"><div class="stats"><div class="stat${glowIf(s.buffed?.ac)}"><div class="v">${+s.ac || 10}</div><div class="k">Armor Class</div></div><div class="stat roll" ${R(x.name + ": Initiative", cmod(+ab.dex || 10))}><div class="v">${sgn(cmod(+ab.dex || 10))}</div><div class="k">Initiative 🎲</div></div><div class="stat${glowIf(s.buffed?.speed)}" style="grid-column:span 2"><div class="v" style="font-size:15px">${esc(s.speed || "—")}</div><div class="k">Speed</div></div></div></div>
+    <div class="card"><h3>Hit points</h3><div class="hpbox"><div><div class="small muted">Current</div><input type="number" value="${hp}" data-act="compHpSet" data-k="${esc(x.key)}"></div><div><div class="small muted">Max</div><div class="big${glowIf(s.buffed?.hp)}" style="font-size:26px;padding-top:4px">${hpMax}</div></div><div><div class="small muted">Temp</div><input type="number" value="${+st.temp || 0}" data-act="compTempSet" data-k="${esc(x.key)}"></div></div>
       <div class="hpbar"><div style="width:${pct}%;background:${pct < 30 ? "#b33" : pct < 60 ? "var(--warn)" : "var(--good)"}"></div></div>
       <div class="row"><input id="compAmt" type="number" min="0" placeholder="amount" style="width:90px"><button class="danger" data-act="compHp" data-k="${esc(x.key)}" data-m="dmg">Damage</button><button style="background:var(--good)" data-act="compHp" data-k="${esc(x.key)}" data-m="heal">Heal</button><button class="ghost" data-act="compHp" data-k="${esc(x.key)}" data-m="full">Full</button></div></div>
     <div class="card"><h3>Attacks</h3>${acts ? `<table class="t"><tr><th>Attack</th><th class="num">Hit</th><th>Damage</th></tr>${acts}</table><p class="small muted">🎲 Tap the hit bonus to attack — on a hit tap “Hit” to roll damage.</p>` : '<p class="muted small">No attacks.</p>'}</div>
@@ -171,7 +172,7 @@ function renderCompanion(c, D, x) {
     <div class="card"><h3>Conditions</h3><div>${CONDITIONS.map(k => `<span class="chip ${(st.cond || []).includes(k) ? "acc" : ""}" style="cursor:pointer" data-act="compCond" data-k="${esc(x.key)}" data-v="${k}">${k}</span>`).join("")}</div></div>`;
   const mt = ["combat", "stats"].includes(S.mtab) ? S.mtab : "combat";
   const mnav = `<nav class="mnav">${[["combat", "❤", "Combat"], ["stats", "◆", "Stats"]].map(([k, i, l]) => `<button class="${mt === k ? "on" : ""}" data-act="mtab" data-k="${k}"><span>${i}</span>${l}</button>`).join("")}<button data-act="compShow" data-k=""><span>↩</span>${esc((c.name || "").split(/[ ,]/)[0])}</button></nav>`;
-  return h + `<div class="sheet compsheet m-${mt}"><div class="col1">${c1}</div><div class="col2">${c2}</div></div>${mnav}`;
+  return h + hb + `<div class="sheet compsheet m-${mt}"><div class="col1">${c1}</div><div class="col2">${c2}</div></div>${mnav}`;
 }
 
 // edit form: name, picture, notes, and overrides of the numbers (own companions: everything)

@@ -69,6 +69,7 @@ const Dice = {
     // feats that add a die to certain checks (Arcane Eloquence …): pre-selected, can be removed with ✕
     if (o.kind === "d20" && S.char && !o.suggest) { const m = String(o.title || "").match(/^(.+?) check$/i), D = derive(S.char), a = m && D.skillAdv?.[m[1]];
       if (a) { this.cur.suggest = "adv"; this.cur.why = a.join(", "); } }
+    if (o.kind === "d20" && S.char && typeof buffD20 === "function") buffD20(S.char, o.title).forEach(b => this.cur.extras.push(b));
     if (o.kind === "d20" && S.char && typeof checkBonusDice === "function") checkBonusDice(S.char, o.title).forEach(b => this.cur.extras.push({ n: b.n, s: b.s, sign: 1, label: b.label }));
     this.renderAsk();
   },
@@ -83,7 +84,7 @@ const Dice = {
       else if (v.startsWith("slot:")) { const L = +v.slice(5); n += (r.per || 0) * (L - r.lvl); spend = { kind: "slot", lvl: L }; lbl += ` (lvl ${L})`; }
     }
     if (r.flat) c.extras.push({ flat: r.flat, type: r.type, label: lbl, rider: i });
-    else c.extras.push({ n, s: r.s, sign: 1, type: r.type, label: lbl, spend, rider: i });
+    else c.extras.push({ n, s: r.s, sign: r.sign || 1, type: r.type, label: lbl, spend, rider: i });
   },
   renderAsk() {
     const c = this.cur, box = document.getElementById("dicebox");

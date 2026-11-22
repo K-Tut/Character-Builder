@@ -489,6 +489,7 @@ function derive(c) {
       note: [beams > 1 ? beams + " beams — roll each beam separately" : "", sa.note || ""].filter(Boolean).join(" · ") };
   });
 
+  if (typeof applyBuffsSelf === "function") applyBuffsSelf(c, D);
   D.features = collectFeatures(c, D);
   D.summary = summary(c, D);
   return D;
