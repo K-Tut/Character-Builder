@@ -603,14 +603,14 @@ body.hasenergy main { padding-left: 46px; }
 .fxshake { animation: fxshake .6s cubic-bezier(.36,.07,.19,.97); }
 @keyframes fxshake { 10%,90% { transform: translate(-2px,1px); } 20%,80% { transform: translate(4px,-2px); } 30%,50%,70% { transform: translate(-7px,3px); } 40%,60% { transform: translate(7px,-3px); } }
 /* lightning: bolts crackle along the top edge */
-.fx-lightning .flash { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0, rgba(255,250,200,.55), transparent 60%); animation: lflash 1.4s steps(1) forwards; opacity: 0; }
+.fx-lightning .flash { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0, rgba(200,230,255,.6), transparent 60%); animation: lflash 1.4s steps(1) forwards; opacity: 0; }
 @keyframes lflash { 0% { opacity: 1; } 8% { opacity: .2; } 14% { opacity: 1; } 28% { opacity: .1; } 34% { opacity: .9; } 52% { opacity: 0; } 58% { opacity: .8; } 70%,100% { opacity: 0; } }
 .fx-lightning svg { position: absolute; left: 0; top: 0; width: 100%; height: 150px; overflow: visible; }
 .fx-lightning .bolt { opacity: 0; animation: bolt 1.5s steps(1) forwards; }
 .fx-lightning path { fill: none; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .fx-lightning .glow { stroke: rgba(150,205,255,.85); stroke-width: 20; filter: blur(6px); }
 .fx-lightning .edge { position: absolute; left: 0; right: 0; top: 0; height: 110px; background: linear-gradient(to bottom, rgba(170,210,255,.7), rgba(120,170,255,.2) 50%, transparent); animation: lflash 1.6s steps(1) forwards; }
-.fx-lightning .core { stroke: #fffbe8; stroke-width: 5; filter: drop-shadow(0 0 6px #ffe66b) drop-shadow(0 0 14px #7ab8ff); }
+.fx-lightning .core { stroke: #f4faff; stroke-width: 5; filter: drop-shadow(0 0 6px #9fd8ff) drop-shadow(0 0 16px #3d8bff); }
 .fx-lightning .core.thin { stroke-width: 2.5; }
 @keyframes bolt { 0% { opacity: 1; } 10% { opacity: .3; } 14% { opacity: 1; } 30% { opacity: .5; } 34% { opacity: 1; } 52% { opacity: 0; } 58% { opacity: 1; } 70%,100% { opacity: 0; } }
 /* fire: flames burn along the bottom */
@@ -667,3 +667,9 @@ body.hasenergy main { padding-left: 46px; }
 .fx-piercing .pierce { position: absolute; left: -30%; top: 30%; width: 40%; height: 3px; background: linear-gradient(90deg, transparent, #fff); box-shadow: 0 0 12px #fff; transform: rotate(18deg); animation: pierce .5s ease-in forwards; }
 @keyframes pierce { 0% { left: -40%; opacity: 1; } 85% { opacity: 1; } 100% { left: 110%; opacity: 0; } }
 .fx-bludgeoning .impact { position: absolute; left: 50%; top: 50%; width: 100px; height: 100px; margin: -50px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.7), rgba(255,220,180,.25) 50%, transparent 70%); animation: wave .7s ease-out forwards; }
+/* alternative builds */
+.buildsw, .buildpick { display: flex; gap: 8px; }
+.buildsw button, .buildpick button { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.buildsw button.on, .buildpick button.on { cursor: default; }
+.buildpick { margin: 0 0 12px; }
+.buildchip { font-size: 12px; vertical-align: middle; cursor: pointer; font-weight: 600; }

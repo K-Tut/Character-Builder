@@ -165,7 +165,7 @@ function renderSheet() {
   const bubs = compBubbles(c, D);
   const bloodied = isBloodied(c, D);
   let h = `<div class="card"><div class="hero">${c.portrait || c.thumb ? `<div class="heroimg ${hp <= 0 ? "down" : bloodied ? "bloodied" : ""}"><img src="${c.portrait || c.thumb}" data-act="viewPortrait" title="Show the whole image">${bubs}</div>` : bubs ? `<div class="heroimg"><div class="compph">🛡</div>${bubs}</div>` : ""}
-    <div class="grow herobody"><h2>${esc(c.name)}</h2>
+    <div class="grow herobody"><h2>${esc(c.name)}${c.alt ? ` <span class="chip acc buildchip" data-act="viewPortrait" title="Switch build">⇄ ${esc(c.buildName || "Build A")}</span>` : ""}</h2>
     <div>${esc(classLine(D))}</div><div class="muted small">${esc([D.species ? D.species.name + (c.species.choice ? " (" + c.species.choice + ")" : "") : "", bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div>
     <div class="heroact"><div class="herorow"><button data-act="levelup">⬆ Level up</button><button class="ghost inspbtn2 ${P.inspiration ? "on" : ""}" data-act="insp" title="Heroic Inspiration">${P.inspiration ? "★" : "☆"} Inspiration</button><button class="ghost heroexp" data-act="exportJson" title="Export this character as a file">⤓</button></div>
       <div class="herorow"><button class="ghost" data-act="shortRest">☕ Short rest</button><button class="ghost" data-act="longRest">🌙 Long rest</button></div></div></div></div></div>`;
@@ -400,7 +400,8 @@ function readFeatRes() {
   document.querySelectorAll(".rmx").forEach(el => { const m = c.resMax ||= {}; if (el.value === "" || +el.value === +el.dataset.def) delete m[el.dataset.k]; else m[el.dataset.k] = +el.value; });
 }
 function mInfo() { return `<h2>${esc(S.modal.title)}</h2>${S.modal.sub ? `<p class="muted small">${esc(S.modal.sub)}</p>` : ""}<div class="desc">${S.modal.html}</div><div class="foot"><button data-act="modalClose">Close</button></div>`; }
-function mImage() { return `<div style="text-align:center"><img src="${S.char.portrait}" style="max-width:100%;max-height:78vh;border-radius:10px"></div><div class="foot"><button class="ghost" data-act="cropThumb">✂ Adjust thumbnail</button><button data-act="modalClose">Close</button></div>`; }
+function mImage() { const c = S.char; return `${c.alt ? `<div class="buildpick">${buildNames(c).map((n, i) => `<button class="${i ? "ghost" : "on"}" ${i ? 'data-act="buildSwap"' : ""}>${i ? "⇄ " : "✓ "}${esc(n)}</button>`).join("")}</div>` : ""}
+  ${c.portrait ? `<div style="text-align:center"><img src="${c.portrait}" style="max-width:100%;max-height:${c.alt ? 70 : 78}vh;border-radius:10px"></div>` : ""}<div class="foot">${c.portrait ? `<button class="ghost" data-act="cropThumb">✂ Adjust thumbnail</button>` : ""}<button data-act="modalClose">Close</button></div>`; }
 // thumbnail crop: drag the picture inside the square, zoom with the slider
 function mCrop() {
   const m = S.modal;
@@ -723,7 +724,7 @@ const ACT = {
   }
 };
 // change-type actions (inputs/selects/checkboxes)
-Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT);
+Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT, BUILD_ACT);
 const CHG = {
   spMode: el => { S.char.spellPoints = el.value === "points"; },
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },

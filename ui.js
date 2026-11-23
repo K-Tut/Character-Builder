@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-23a";
+const APP_VERSION = "2026-11-23b";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -245,7 +245,7 @@ function renderBuilder() {
 
 function bBasics(c, D) {
   const ph = c.phys;
-  return `<div class="grid g2">
+  return bBuildsCard(c) + `<div class="grid g2">
   <div class="card"><h3>Identity</h3>
     <div class="grid g2"><label>Character name<br>${inp("name", c.name, { style: "width:100%" })}</label><label>Player<br>${inp("player", c.player, { style: "width:100%" })}</label></div>
     <h3 style="margin-top:14px">Physical</h3>

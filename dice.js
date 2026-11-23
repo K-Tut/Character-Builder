@@ -28,7 +28,7 @@ const DT_ICON = {
   slashing: '<path d="M12 1.5l2 2.8V15h-4V4.3z" stroke="none"/><path d="M6.5 15.8h11" fill="none" stroke-width="2.2"/><path d="M12 16v4" fill="none" stroke-width="2.2"/><circle cx="12" cy="21.3" r="1.4" stroke="none"/>',
   thunder: '<circle cx="12" cy="12" r="2" stroke="none"/><path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6M5.2 5.2a9.6 9.6 0 0 0 0 13.6M18.8 5.2a9.6 9.6 0 0 1 0 13.6" fill="none" stroke-width="1.8"/>'
 };
-const DT_COLOR = { acid: "#9db21b", cold: "#2f8fc9", fire: "#d4471c", force: "#7a3fd1", lightning: "#e0ad12", necrotic: "#3b2a47", poison: "#3d8c38", psychic: "#c93f95", radiant: "#ecc94b", thunder: "#4e5c94" };
+const DT_COLOR = { acid: "#9db21b", cold: "#f2f6fa", fire: "#d4471c", force: "#7a3fd1", lightning: "#7cc8f8", necrotic: "#3b2a47", poison: "#3d8c38", psychic: "#c93f95", radiant: "#ecc94b", thunder: "#4e5c94" };
 const dtKey = t => String(t || "").toLowerCase().trim();
 function dtIcon(t, cls = "") { const k = dtKey(t); return DT_ICON[k] ? `<svg class="dti ${cls}" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-label="${esc(k)}"><title>${esc(t)}</title>${DT_ICON[k]}</svg>` : ""; }
 // "1d8 fire" / "Fire" -> "fire"
