@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-23b";
+const APP_VERSION = "2026-11-23c";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -713,11 +713,23 @@ function featLevels(features) {
   const out = []; for (const lv of Object.keys(features).map(Number).sort((a, b) => a - b)) for (const n of features[lv]) if (!n.startsWith("@")) out.push([n, lv]);
   return out;
 }
+// extra feats (from your DM, a magic item, a variant rule …) — they count like any other feat
+function bonusFeatsCard(c, D) {
+  const list = (c.bonusFeats || []).filter(f => f && f.name), cat = S.ui.bfCat || "origin", n = (c.bonusFeats || []).length;
+  const tabs = [["origin", "Origin feats"], ["style", "Fighting Style feats"], ["general", "General feats"]];
+  return `<div class="card"><h3>Extra feats</h3><p class="small muted">Feats you get on top of your normal ones (from your DM, a magic item, a house rule …). They work like any other feat: ability increases, picks and uses all count.</p>
+    ${list.length ? list.map(f => { const i = c.bonusFeats.indexOf(f), fi = featInfo(f.name); return `<div class="lvl"><div class="row"><b>${esc(f.name)}</b><span class="chip">${esc((FEAT_CATS[fi?.cat] || "Feat").replace(/ feats$/, " feat"))}</span>
+      <a href="#" class="small" data-act="featInfoTog" data-id="bf${i}" data-v="${esc(f.name)}">${S.ui.featInfo === "bf" + i ? "▾ hide" : "▸ details"}</a><button class="small ghost right" data-act="bfDel" data-i="${i}">✕ Remove</button></div>
+      ${S.ui.featInfo === "bf" + i ? `<div class="desc">${para(featDesc(f.name)) || '<span class="muted">No description imported.</span>'}</div>` : ""}${featPicks("bonusFeats." + i, f, D)}</div>`; }).join("") : ""}
+    <div class="row bftabs" style="margin:10px 0 4px"><b class="small">＋ Add a feat:</b>${tabs.map(([k, l]) => `<button class="small ${cat === k ? "" : "ghost"}" data-act="bfCat" data-k="${k}">${l}</button>`).join("")}</div>
+    ${featSelect("bonusFeats." + n, null, [cat])}</div>`;
+}
 function bExtra(c, D) {
   const mine = c.extraFeats || [], open = S.ui.xfOpen || [];
   const nameOf = k => { const x = xfParse(k); return `${esc(x.name)} <span class="muted">(${esc(xfSource(x)?.name || "?")})</span>`; };
   let h = `<div class="card"><h3>Extra features</h3><p class="small muted">Take features from any class, subclass or species — for example Divine Sense from the Paladin or an Elf's Fey Ancestry. Ticked features appear on your play sheet under Features. If the feature has uses (Rage, Breath Weapon, Channel Divinity …) they appear under Resources, counted with your character level; "… Spells" features add their spells. Otherwise tap ✎ on the feature to give it uses per rest.</p>
     ${mine.length ? `<div>${mine.map(k => `<span class="chip acc">${nameOf(k)} <a href="#" data-act="xfRemove" data-k="${esc(k)}">✕</a></span>`).join("")}</div>` : `<p class="muted small">Nothing added yet.</p>`}</div>`;
+  h += bonusFeatsCard(c, D);
   for (const [cls, C] of Object.entries(CLASSES)) {
     const n = mine.filter(k => k.startsWith(cls + "|")).length, isOpen = open.includes(cls);
     h += `<details class="card xfcls" ${isOpen ? "open" : ""}><summary data-act="xfOpen" data-k="${cls}"><b>${esc(C.name)}</b>${n ? ` <span class="chip acc">${n} added</span>` : ""}</summary>`;

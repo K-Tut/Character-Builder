@@ -587,6 +587,8 @@ const ACT = {
   del: el => { const arr = getPath(target(), el.dataset.p); arr.splice(+el.dataset.i, 1); if (el.dataset.p === "custom") { S.char.featureMeta = Object.fromEntries(Object.entries(S.char.featureMeta).filter(([k]) => !k.startsWith("custom:"))); } save(); render(); },
   spellDel: (el, e) => { e.preventDefault(); S.char.spells = S.char.spells.filter(s => !(s.name === el.dataset.n && s.cls === el.dataset.c)); save(); render(); },
   spellAddMan: el => { const n = $("#spman").value.trim(); if (!n) return; S.char.spells.push({ name: n, cls: el.dataset.c, level: +$("#spmanl").value }); save(); render(); },
+  bfCat: el => { S.ui.bfCat = el.dataset.k; render(); },
+  bfDel: el => { const a = S.char.bonusFeats || []; a.splice(+el.dataset.i, 1); S.char.bonusFeats = a.filter(f => f && f.name); save(); render(); },
   lvlOpen: el => { const o = S.ui.lvOpen ||= {}; o[el.dataset.i] = !o[el.dataset.i]; render(); },
   toggleOpen: (el, e) => { if (e.target.closest("button, input, a")) return; const b = el.closest(".feat, .spell")?.querySelector(".body"); if (b) b.classList.toggle("hidden"); },
   hp: el => {

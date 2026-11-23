@@ -5,7 +5,7 @@
 const BUILD_KEYS = ["species", "speciesFeat", "background", "bgFeat", "abilMethod", "base", "levels", "subclasses", "pools", "spells", "skillAbil", "optChoices",
   "languages", "langExtra", "otherProfs", "armor", "shield", "armorSrc", "shieldSrc", "acBonus", "initBonus", "speedBonus", "hpBonus", "hitBonus", "weapons",
   "custom", "featureMeta", "featRes", "resMax", "freeCasts", "extraFeats", "spellPoints", "comps", "ownComps", "spellAttacks", "homebrewSpells", "resist",
-  "resistFrom", "fightingStyleExtra", "startGold", "startEquip", "play"];
+  "resistFrom", "fightingStyleExtra", "bonusFeats", "startGold", "startEquip", "play"];
 function buildPick(c) { const o = {}; BUILD_KEYS.forEach(k => { if (k in c) o[k] = JSON.parse(JSON.stringify(c[k])); }); return o; }
 function buildNames(c) { return [c.buildName || "Build A", c.alt?.name || "Build B"]; }
 function altCreate(c) {

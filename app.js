@@ -184,6 +184,7 @@ function restFeats(c) {
   c.levels.forEach((lv, i) => {
     if (lv.asi?.mode === "feat" && lv.asi.feat?.name) out.push({ ...lv.asi.feat, src: CLASSES[lv.cls].name + " lvl " + classLevelAt(c, i) });
   });
+  (c.bonusFeats || []).forEach(f => { if (f && f.name) out.push({ ...f, src: "Extra feat" }); });
   return out;
 }
 function classLevelAt(c, i) { let n = 0; for (let j = 0; j <= i; j++) if (c.levels[j].cls === c.levels[i].cls) n++; return n; }
@@ -310,7 +311,7 @@ function derive(c) {
   const unarmoredAbils = [];
   for (const k in D.cls) { (CLASSES[k].unarmored || []).forEach(a => unarmoredAbils.push([k, a])); (D.subs[k]?.unarmored || []).forEach(a => unarmoredAbils.push([k, a])); }
   let ac;
-  const styles = picked("fightingStyle");
+  const styles = picked("fightingStyle").concat((D.feats || allFeats(c)).filter(f => FEATS[f.name]?.cat === "style").map(f => f.name));
   if (arm.kind === "none") {
     ac = 10 + D.mod.dex;
     for (const [k, a] of unarmoredAbils) { if (k === "monk" && c.shield) continue; ac = Math.max(ac, 10 + D.mod.dex + D.mod[a]); }
