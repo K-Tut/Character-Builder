@@ -180,6 +180,7 @@ const Dice = {
     this.history = this.history.slice(0, 25);
     this.lastRoll = { title, res, groups, flat, isD20, tflat };
     this.show(title, res, total, breakdown, crit, fumble, split);
+    if (split && typeof FX !== "undefined") FX.play(split.filter(p => p.type && p.v > 0).sort((a, b) => b.v - a.v).map(p => p.type), 600 + Math.max(0, res.length - 1) * 110);
   },
   show(title, res, total, breakdown, crit, fumble, split) {
     const el = document.getElementById("diceres");
@@ -247,6 +248,7 @@ const Dice = {
       <div class="row"><span class="diceformula" style="flex:1">${formula || '<span class="muted">nothing selected</span>'}</span>
         <label class="small">Mod <input type="number" id="traymod" value="${T.mod || 0}" style="width:56px" data-act-input="trayMod"></label></div>
       <div class="row" style="margin-top:6px"><button data-act="trayRoll" ${pool.length ? "" : "disabled"} style="flex:1">Roll</button><button class="ghost" data-act="trayClear">Clear</button></div>
+      <div class="row small" style="margin-top:8px"><label><input type="checkbox" data-act="fxToggle" ${typeof FX !== "undefined" && FX.on() ? "checked" : ""}> ✨ Damage effects on screen (fire, lightning, skulls …)</label></div>
       <div class="row small" style="margin-top:8px">Dice color: ${DICE_COLORS.map(col => `<span class="swatch ${col === this.color ? "on" : ""}" style="background:${col}" data-act="diceColor" data-c="${col}"></span>`).join("")}<input type="color" value="${this.color}" data-act="diceColorPick" title="Custom color"></div>
       ${this.history.length ? `<div class="trayhist">${this.history.map(h => `<div><span class="muted small">${h.t}</span> ${esc(h.title)}: <b class="${h.crit ? "good" : h.fumble ? "warn" : ""}">${h.total}</b>${h.split && h.split.length > 1 ? ` <span class="small">(${h.split.map(p => p.v + (p.type ? " " + dtIcon(p.type, "inl") : "")).join(" + ")})</span>` : h.split && h.split[0]?.type ? " " + dtIcon(h.split[0].type, "inl") : ""} <span class="small muted">(${h.breakdown})</span></div>`).join("")}</div>` : ""}`;
   }

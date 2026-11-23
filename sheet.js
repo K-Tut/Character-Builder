@@ -728,6 +728,7 @@ const CHG = {
   spMode: el => { S.char.spellPoints = el.value === "points"; },
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },
   grpToggle: el => { const m = S.modal, id = el.dataset.id; m.name = $("#grpname").value; m.ids = el.checked ? [...new Set([...m.ids, id])] : m.ids.filter(x => x !== id); },
+  fxToggle: el => { FX.set(el.checked); if (el.checked) FX.play(["fire", "lightning"], 0); },
   poolSet: el => { const t = target(), a = t.pools[el.dataset.k] ||= [], j = +el.dataset.j; if (!el.value) { if (j < a.length) a.splice(j, 1); } else if (j < a.length) a[j] = el.value; else a.push(el.value); },
   restChoice: el => { S.char.pools[el.dataset.k] = el.value ? [el.value] : []; },
   freeToggle: el => { const n = el.dataset.n, a = S.char.freeCasts ||= []; const i = a.indexOf(n); i >= 0 ? a.splice(i, 1) : a.push(n); },
