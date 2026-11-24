@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-24a";
+const APP_VERSION = "2026-11-24b";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -602,10 +602,22 @@ function spellList(c, D, cur, cs) {
   if (q) list = list.filter(s => norm(s.name).includes(q));
   if ((cur === "other" || S.ui.spAll) && S.ui.spClass) list = list.filter(s => s.classes.includes(S.ui.spClass));
   if ((S.ui.spSchools || []).length) list = list.filter(s => S.ui.spSchools.includes(s.school));
+  // casting time, damage type and range filters (options come from the spells still in the list)
+  const dts = [...new Set(list.flatMap(s => spellDmgTypes(s)))].sort((a, b) => a === "healing" ? 1 : b === "healing" ? -1 : a.localeCompare(b));
+  const rgs = [...new Set(list.map(s => rangeKey(s.range)).filter(Boolean))].sort((a, b) => rangeOrder(a) - rangeOrder(b) || a.localeCompare(b));
+  const FT = S.ui.bspf || "", FD = dts.includes(S.ui.bspd) ? S.ui.bspd : "", FR = rgs.includes(S.ui.bspr) ? S.ui.bspr : "";
+  const TIMES = [["", "Any casting time"], ["A", "Action"], ["BA", "Bonus action"], ["R", "Reaction"], ["rit", "Ritual"], ["conc", "Concentration"]];
+  const filt = `<div class="spfilter2"><select data-act="bspTime" class="${FT ? "on" : ""}">${TIMES.map(([k, l]) => `<option value="${k}" ${FT === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <select data-act="bspDmg" class="${FD ? "on" : ""}"><option value="">Any damage type</option>${dts.map(t => `<option value="${t}" ${FD === t ? "selected" : ""}>${t === "healing" ? "♥ Healing" : cap(t)}</option>`).join("")}</select>
+    <select data-act="bspRange" class="${FR ? "on" : ""}"><option value="">Any range</option>${rgs.map(r => `<option ${FR === r ? "selected" : ""}>${esc(r)}</option>`).join("")}</select>
+    ${FT || FD || FR ? `<button class="small ghost" data-act="bspClear">✕ Clear</button>` : ""}</div>`;
+  if (FT) list = list.filter(s => FT === "rit" ? s.ritual : FT === "conc" ? s.conc : actKind("", s.time) === FT);
+  if (FD) list = list.filter(s => spellDmgTypes(s).includes(FD));
+  if (FR) list = list.filter(s => rangeKey(s.range) === FR);
   const chosen = new Set(c.spells.filter(s => s.cls === cur).map(s => s.name));
-  if (!list.length) return '<p class="muted small">No spells match these filters.</p>';
+  if (!list.length) return filt + '<p class="muted small">No spells match these filters.</p>';
   const groups = {}; list.slice(0, 400).forEach(s => (groups[s.level] ||= []).push(s));
-  return Object.entries(groups).map(([lv, ss]) => `<h4 style="margin:10px 0 4px">${+lv ? "Level " + lv : "Cantrips"}</h4>` + ss.map(s => `
+  return filt + Object.entries(groups).map(([lv, ss]) => `<h4 style="margin:10px 0 4px">${+lv ? "Level " + lv : "Cantrips"}</h4>` + ss.map(s => `
     <div class="spell"><div class="h"><input type="checkbox" data-act="spellToggle" data-n="${esc(s.name)}" data-l="${s.level}" data-c="${cur}" ${chosen.has(s.name) ? "checked" : ""}>
     <b data-act="toggleOpen" style="flex:1">${esc(s.name)}</b>${s.custom ? '<span class="tag own">★ own</span>' : ""}<span class="tag">${esc(s.school)}</span>${s.conc ? '<span class="tag">C</span>' : ""}${s.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.time)}</span></div>
     <div class="body hidden"><div class="meta">${esc([s.time && "Casting time: " + s.time, s.range && "Range: " + s.range, s.comp && "Components: " + s.comp, s.dur && "Duration: " + s.dur].filter(Boolean).join(" · "))}</div><div class="desc">${para(s.text)}</div>
