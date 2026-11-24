@@ -673,3 +673,6 @@ body.hasenergy main { padding-left: 46px; }
 .buildsw button.on, .buildpick button.on { cursor: default; }
 .buildpick { margin: 0 0 12px; }
 .buildchip { font-size: 12px; vertical-align: middle; cursor: pointer; font-weight: 600; }
+.spfilter2 { display: flex; gap: 8px; margin: 6px 0 4px; flex-wrap: wrap; }
+.spfilter2 select { flex: 1; min-width: 130px; }
+.spfilter2 select.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }

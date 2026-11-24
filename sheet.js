@@ -250,6 +250,29 @@ function freeToggle(name, D, c) {
   if (r && !mine) return `<div class="small muted" style="margin-bottom:6px">Free cast without a slot: ${esc(r.src || r.name)} (${r.reset === "SR" ? "short rest" : "long rest"})</div>`;
   return `<label class="small" style="display:block;margin-bottom:6px"><input type="checkbox" data-act="freeToggle" data-n="${esc(name)}" ${mine ? "checked" : ""}> I can cast this once per long rest without a spell slot (feat, item …)</label>`;
 }
+// spell filters: damage types named in the text ("… 8d6 Fire damage"), healing, and a tidy range ("Self", "Touch", "120 ft")
+function spellDmgTypes(si) {
+  if (!si) return [];
+  const t = String(si.text || ""); if (DT_CACHE.has(t)) return DT_CACHE.get(t); const out = new Set();
+  for (const m of t.matchAll(/\b(acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder)\b(?:,|\s+or\s+|\s+and\s+|\s)*(?:\w+\s+){0,1}damage/gi)) out.add(m[1].toLowerCase());
+  // "Acid, Cold, Fire, Lightning or Thunder damage" lists
+  for (const m of t.matchAll(/((?:(?:acid|cold|fire|lightning|necrotic|poison|psychic|radiant|thunder|force)(?:,\s*|\s+or\s+|\s*,\s*or\s+))+(?:acid|cold|fire|lightning|necrotic|poison|psychic|radiant|thunder|force))\s+damage/gi))
+    m[1].split(/,|\bor\b/i).forEach(x => { x = x.trim().toLowerCase(); if (x) out.add(x); });
+  // "Choose Acid, Cold, Fire, Lightning, Poison, or Thunder" (Chromatic Orb, Dragon's Breath …)
+  if (/damage/i.test(t)) for (const m of t.matchAll(/\b((?:(?:acid|cold|fire|lightning|necrotic|poison|psychic|radiant|thunder|force)\s*(?:,\s*or\s+|,\s*|\s+or\s+)){1,}(?:acid|cold|fire|lightning|necrotic|poison|psychic|radiant|thunder|force))\b/gi))
+    m[1].split(/,|\bor\b/i).forEach(x => { x = x.trim().toLowerCase(); if (x) out.add(x); });
+  if (/regains?\s+(?:a number of\s+)?(?:Hit Points|\d*d\d+)|regain\s+Hit Points|restores? .{0,20}Hit Points/i.test(t)) out.add("healing");
+  const r = [...out]; DT_CACHE.set(t, r); return r;
+}
+const DT_CACHE = new Map();
+function rangeKey(r) {
+  if (!r) return "";
+  const s = String(r).trim(), l = s.toLowerCase();
+  if (l.startsWith("self")) return "Self"; if (l.startsWith("touch")) return "Touch";
+  const m = l.match(/(\d[\d,]*)\s*(feet|foot|ft|miles?)/); if (m) return m[2].startsWith("mile") ? `${m[1]} ${+m[1] === 1 ? "mile" : "miles"}` : `${m[1]} ft`;
+  return s[0].toUpperCase() + s.slice(1);
+}
+function rangeOrder(k) { if (k === "Self") return -2; if (k === "Touch") return -1; const n = parseInt(String(k).replace(/,/g, "")); return isNaN(n) ? 1e9 : /mile/.test(k) ? n * 5280 : n; }
 function sheetSpells(c, D) {
   const groups = {};
   const add = (name, src, always, lvlHint) => { const si = spellInfo(name); const l = si?.level ?? lvlHint ?? "?"; (groups[l] ||= []).push({ name, src, always, si }); };
@@ -260,8 +283,15 @@ function sheetSpells(c, D) {
   if (D.slots.length || D.pact || D.spellPoints) h += `<div class="spslots"><h3 style="margin:10px 0 4px">${D.spellPoints ? "Spell points" : "Spell slots"}</h3>${slotRows(D, c.play)}</div>`;
   if (!Object.keys(groups).length) return h + `<p class="muted">No spells.</p>`;
   const F = S.ui.spf || "", FILT = [["", "All"], ["A", "Action"], ["BA", "Bonus action"], ["R", "Reaction"], ["rit", "Ritual"], ["conc", "Concentration"]];
-  const pass = s => !F || (F === "rit" ? s.si?.ritual : F === "conc" ? s.si?.conc : actKind("", s.si?.time) === F);
-  h += `<div class="spfilter">${FILT.map(([k, l]) => `<button class="small ${F === k ? "" : "ghost"}" data-act="spFilter" data-f="${k}">${l}</button>`).join("")}</div>`;
+  const all = Object.values(groups).flat();
+  const dts = [...new Set(all.flatMap(s => spellDmgTypes(s.si)))].sort((a, b) => a === "healing" ? 1 : b === "healing" ? -1 : a.localeCompare(b));
+  const rgs = [...new Set(all.map(s => rangeKey(s.si?.range)).filter(Boolean))].sort((a, b) => rangeOrder(a) - rangeOrder(b) || a.localeCompare(b));
+  let FD = S.ui.spd || "", FR = S.ui.spr || ""; if (FD && !dts.includes(FD)) FD = ""; if (FR && !rgs.includes(FR)) FR = "";
+  const pass = s => (!F || (F === "rit" ? s.si?.ritual : F === "conc" ? s.si?.conc : actKind("", s.si?.time) === F)) && (!FD || spellDmgTypes(s.si).includes(FD)) && (!FR || rangeKey(s.si?.range) === FR);
+  h += `<div class="spfilter">${FILT.map(([k, l]) => `<button class="small ${F === k ? "" : "ghost"}" data-act="spFilter" data-f="${k}">${l}</button>`).join("")}</div>
+    <div class="spfilter2"><select data-act="spDmg" class="${FD ? "on" : ""}"><option value="">Any damage type</option>${dts.map(t => `<option value="${t}" ${FD === t ? "selected" : ""}>${t === "healing" ? "♥ Healing" : t[0].toUpperCase() + t.slice(1)}</option>`).join("")}</select>
+      <select data-act="spRange" class="${FR ? "on" : ""}"><option value="">Any range</option>${rgs.map(r => `<option ${FR === r ? "selected" : ""}>${esc(r)}</option>`).join("")}</select>
+      ${FD || FR || F ? `<button class="small ghost" data-act="spFilterClear">✕ Clear</button>` : ""}</div>`;
   for (const k in groups) groups[k] = groups[k].filter(pass);
   for (const k in groups) if (!groups[k].length) delete groups[k];
   if (!Object.keys(groups).length) h += `<p class="muted small">No spells match this filter.</p>`;
@@ -497,6 +527,7 @@ const ACT = {
   dsRoll: () => Dice.ask({ kind: "d20", title: "Death saving throw", mod: 0, onDone: applyDeathSave }),
   dsTap: el => { const P = S.char.play, k = el.dataset.k, i = +el.dataset.i; P.ds[k] = P.ds[k] > i ? i : i + 1; save(); render(); },
   spFilter: el => { S.ui.spf = el.dataset.f; render(); },
+  spFilterClear: () => { S.ui.spf = ""; S.ui.spd = ""; S.ui.spr = ""; render(); },
   groupToggle: (el, e) => { if (e.target.closest("[data-act=groupEdit]")) return; const g = el.dataset.g, o = openGroups(); const i = o.indexOf(g); i >= 0 ? o.splice(i, 1) : o.push(g); try { localStorage.setItem("openGroups", JSON.stringify(o)); } catch (x) { } render(); },
   groupEdit: (el, e) => { e?.stopPropagation(); const g = el.dataset.g || ""; openModal({ type: "group", orig: g, name: g, ids: S.chars.filter(c => g && c.group === g).map(c => c.id) }); },
   grpSave: async () => {
@@ -732,6 +763,8 @@ const CHG = {
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },
   grpToggle: el => { const m = S.modal, id = el.dataset.id; m.name = $("#grpname").value; m.ids = el.checked ? [...new Set([...m.ids, id])] : m.ids.filter(x => x !== id); },
   fxToggle: el => { FX.set(el.checked); if (el.checked) FX.play(["fire", "lightning"], 0); },
+  spDmg: el => { S.ui.spd = el.value; },
+  spRange: el => { S.ui.spr = el.value; },
   poolSet: el => { const t = target(), a = t.pools[el.dataset.k] ||= [], j = +el.dataset.j; if (!el.value) { if (j < a.length) a.splice(j, 1); } else if (j < a.length) a[j] = el.value; else a.push(el.value); },
   restChoice: el => { S.char.pools[el.dataset.k] = el.value ? [el.value] : []; },
   freeToggle: el => { const n = el.dataset.n, a = S.char.freeCasts ||= []; const i = a.indexOf(n); i >= 0 ? a.splice(i, 1) : a.push(n); },
