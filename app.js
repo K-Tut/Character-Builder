@@ -445,6 +445,7 @@ function derive(c) {
   D.feats.forEach(f => { if (FEAT_FREE[f.name]) addFree(FEAT_FREE[f.name], f.name, f.name); });
   if (picked("invocations").includes("Gift of the Depths")) addFree("Water Breathing", "Gift of the Depths", "Gift of the Depths");
   for (const k in D.subs) for (const lv in D.subs[k].freeCasts || {}) if (D.cls[k] >= +lv) D.subs[k].freeCasts[lv].forEach(n => addFree(n, D.subs[k].name, n));
+  for (const r of D.restChoices || []) if (r.pick && r.ch.free?.[r.pick]) r.ch.free[r.pick].forEach(n => addFree(n, r.sub.name + " (" + r.pick + ")", r.ch.label));
   (c.freeCasts || []).forEach(n => addFree(n, "Added by you", n));
   // resources you added to a feature yourself
   for (const fk in c.featRes || {}) (c.featRes[fk] || []).forEach((r, i) => D.resources.push({ key: "fr_" + norm(fk).replace(/ /g, "_") + "_" + i, name: r.name || "Resource", max: +r.uses || 0, reset: r.reset || "LR", feature: r.feature || "", src: "Added by you", featKey: fk, idx: i, manual: true }));

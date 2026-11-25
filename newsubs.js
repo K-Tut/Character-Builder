@@ -187,6 +187,25 @@ Object.assign(CLASSES.druid.subclasses.land, {
     resist: { "Arid": ["Fire"], "Polar": ["Cold"], "Temperate": ["Lightning"], "Tropical": ["Poison"] }, resistFrom: 10 }]
 });
 
+// Lunar Sorcery: the lunar phase is picked again after each Long Rest (2014 rules adapted: level-1 spells come at level 3)
+if (CLASSES.sorcerer?.subclasses?.lunar) Object.assign(CLASSES.sorcerer.subclasses.lunar, {
+  spells: { 3: ["Sacred Flame"] },
+  choices: [{ key: "lunarPhase", label: "Lunar phase", from: 3, reset: "LR", options: ["Full Moon", "New Moon", "Crescent Moon"],
+    spells: {
+      "Full Moon": { 3: ["Shield", "Lesser Restoration"], 5: ["Dispel Magic"], 7: ["Death Ward"], 9: ["Rary's Telepathic Bond"] },
+      "New Moon": { 3: ["Ray of Sickness", "Blindness/Deafness"], 5: ["Vampiric Touch"], 7: ["Confusion"], 9: ["Hold Monster"] },
+      "Crescent Moon": { 3: ["Color Spray", "Alter Self"], 5: ["Phantom Steed"], 7: ["Hallucinatory Terrain"], 9: ["Mislead"] } },
+    free: { "Full Moon": ["Shield"], "New Moon": ["Ray of Sickness"], "Crescent Moon": ["Color Spray"] },
+    desc: {
+      "Full Moon": "Bright and protective. Lunar Boons (level 6): Metamagic on Abjuration and Divination spells costs 1 Sorcery Point less. Lunar Phenomenon (level 18): bright light bursts 30 ft around you — creatures you choose make a Con save or are Blinded until your next turn, and you or one creature in the area regains 3d8 HP.",
+      "New Moon": "Dark and draining. Lunar Boons (level 6): Metamagic on Enchantment and Necromancy spells costs 1 Sorcery Point less. Lunar Phenomenon (level 18): shadow bursts from you — creatures you choose within 30 ft take Necrotic damage, and you can slip away unseen. Check the book for the exact numbers.",
+      "Crescent Moon": "Shifting and elusive. Lunar Boons (level 6): Metamagic on Illusion and Transmutation spells costs 1 Sorcery Point less. Lunar Phenomenon (level 18): you teleport up to 60 ft and gain Resistance to all damage until the start of your next turn." },
+  }],
+  resources: [...(CLASSES.sorcerer.subclasses.lunar.resources || []),
+    { key: "lunarBoon", name: "Lunar Boons", feature: "Lunar Boons", reset: "LR", n: (l, D) => l >= 6 ? Math.max(1, D.mod.cha) : 0, note: "Metamagic −1 SP for your phase's schools" },
+    { key: "lunarPhen", name: "Lunar Phenomenon", feature: "Lunar Phenomenon", reset: "LR", n: (l, D) => l >= 18 ? 1 : 0, note: "or 5 Sorcery Points" }]
+});
+
 // every choice becomes a pool, so it can be picked at level-up (and changed on rests)
 for (const C of Object.values(CLASSES)) for (const s of Object.values(C.subclasses)) for (const ch of s.choices || []) {
   POOLS[ch.key] = { label: ch.label, options: () => ch.options.slice() };

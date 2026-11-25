@@ -677,3 +677,17 @@ body.hasenergy main { padding-left: 46px; }
 .spfilter2 select { flex: 1; min-width: 130px; }
 .spfilter2 select.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .advmark.skbonus { color: var(--accent); }
+/* aspects chosen on a rest (Lunar phase, Land type …) */
+.aspgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; margin-top: 6px; }
+.aspect { display: block; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; background: var(--panel); }
+.aspect.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.aspect input { display: none; }
+.asphead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.asphead img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+.aspsp { margin-top: 4px; }
+.aspchips { margin: 2px 0 4px; }
+.aspchips .chip { font-size: 12px; }
+.aspimgs { display: flex; gap: 10px; flex-wrap: wrap; }
+.aspimg { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 84px; text-align: center; }
+.aspimg img, .aspimg .aspadd { width: 72px; height: 96px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent; padding: 0; }
+.aspimg.on img, .aspimg.on .aspadd { border-color: var(--accent); }

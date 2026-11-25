@@ -164,8 +164,10 @@ function renderSheet() {
   const bg = bgData(c);
   const bubs = compBubbles(c, D);
   const bloodied = isBloodied(c, D);
-  let h = `<div class="card"><div class="hero">${c.portrait || c.thumb ? `<div class="heroimg ${hp <= 0 ? "down" : bloodied ? "bloodied" : ""}"><img src="${c.portrait || c.thumb}" data-act="viewPortrait" title="Show the whole image">${bubs}</div>` : bubs ? `<div class="heroimg"><div class="compph">🛡</div>${bubs}</div>` : ""}
-    <div class="grow herobody"><h2>${esc(c.name)}${c.alt ? ` <span class="chip acc buildchip" data-act="viewPortrait" title="Switch build">⇄ ${esc(c.buildName || "Build A")}</span>` : ""}</h2>
+  const pimg = aspectPortrait(c, D) || c.portrait || c.thumb;
+  const aspects = (D.restChoices || []).filter(r => r.ch.reset && r.pick);
+  let h = `<div class="card"><div class="hero">${pimg ? `<div class="heroimg ${hp <= 0 ? "down" : bloodied ? "bloodied" : ""}"><img src="${pimg}" data-act="viewPortrait" title="Show the whole image">${bubs}</div>` : bubs ? `<div class="heroimg"><div class="compph">🛡</div>${bubs}</div>` : ""}
+    <div class="grow herobody"><h2>${esc(c.name)}${c.alt ? ` <span class="chip acc buildchip" data-act="viewPortrait" title="Switch build">⇄ ${esc(c.buildName || "Build A")}</span>` : ""}</h2>${aspects.length ? `<div class="aspchips">${aspects.map(r => `<span class="chip" title="${esc(r.ch.label)} — change on a ${r.ch.reset === "SR" ? "Short or Long" : "Long"} Rest">${esc(r.pick)}</span>`).join("")}</div>` : ""}
     <div>${esc(classLine(D))}</div><div class="muted small">${esc([D.species ? D.species.name + (c.species.choice ? " (" + c.species.choice + ")" : "") : "", bg?.name, "Level " + D.level].filter(Boolean).join(" · "))}</div>
     <div class="heroact"><div class="herorow"><button data-act="levelup">⬆ Level up</button><button class="ghost inspbtn2 ${P.inspiration ? "on" : ""}" data-act="insp" title="Heroic Inspiration">${P.inspiration ? "★" : "☆"} Inspiration</button><button class="ghost heroexp" data-act="exportJson" title="Export this character as a file">⤓</button></div>
       <div class="herorow"><button class="ghost" data-act="shortRest">☕ Short rest</button><button class="ghost" data-act="longRest">🌙 Long rest</button></div></div></div></div></div>`;
@@ -430,7 +432,7 @@ function readFeatRes() {
   document.querySelectorAll(".rmx").forEach(el => { const m = c.resMax ||= {}; if (el.value === "" || +el.value === +el.dataset.def) delete m[el.dataset.k]; else m[el.dataset.k] = +el.value; });
 }
 function mInfo() { return `<h2>${esc(S.modal.title)}</h2>${S.modal.sub ? `<p class="muted small">${esc(S.modal.sub)}</p>` : ""}<div class="desc">${S.modal.html}</div><div class="foot"><button data-act="modalClose">Close</button></div>`; }
-function mImage() { const c = S.char; return `${c.alt ? `<div class="buildpick">${buildNames(c).map((n, i) => `<button class="${i ? "ghost" : "on"}" ${i ? 'data-act="buildSwap"' : ""}>${i ? "⇄ " : "✓ "}${esc(n)}</button>`).join("")}</div>` : ""}
+function mImage() { let c = S.char; const ap = aspectPortrait(c, derive(c)); if (ap) c = { ...c, portrait: ap }; return `${c.alt ? `<div class="buildpick">${buildNames(c).map((n, i) => `<button class="${i ? "ghost" : "on"}" ${i ? 'data-act="buildSwap"' : ""}>${i ? "⇄ " : "✓ "}${esc(n)}</button>`).join("")}</div>` : ""}
   ${c.portrait ? `<div style="text-align:center"><img src="${c.portrait}" style="max-width:100%;max-height:${c.alt ? 70 : 78}vh;border-radius:10px"></div>` : ""}<div class="foot">${c.portrait ? `<button class="ghost" data-act="cropThumb">✂ Adjust thumbnail</button>` : ""}<button data-act="modalClose">Close</button></div>`; }
 // thumbnail crop: drag the picture inside the square, zoom with the slider
 function mCrop() {
@@ -490,10 +492,24 @@ function mShortRest() {
 function restChoiceList(D, rest) { return (D.restChoices || []).filter(r => r.ch.reset === "SR" || (rest === "LR" && r.ch.reset === "LR")); }
 function restChoiceUI(D, rest) {
   const list = restChoiceList(D, rest); if (!list.length) return "";
+  const c = S.char, lvl = r => D.cls[r.cls] || 0;
+  // what an option gives at this level: its text + the spells you'd have (up to your level)
+  const spellsAt = (r, o) => Object.entries(r.ch.spells?.[o] || {}).filter(([l]) => lvl(r) >= +l).flatMap(([, a]) => a);
   return `<div class="card" style="margin:10px 0"><h3 style="margin-top:0">${rest === "LR" ? "Choices for the next day" : "Choices on this rest"}</h3>` + list.map(r => `
-    <label style="display:block;margin:6px 0"><b>${esc(r.ch.label)}</b> <span class="small muted">(${esc(r.sub.name)})</span><br>
-      <select data-act="restChoice" data-k="${r.ch.key}">${r.pick ? "" : '<option value="">— choose —</option>'}${r.ch.options.map(o => `<option ${o === r.pick ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label>
-    ${r.pick ? `<div class="small desc" style="margin:2px 0 8px">${para(choiceText(r.ch, r.pick))}</div>` : ""}`).join("") + `</div>`;
+    <div style="margin:8px 0 12px"><b>${esc(r.ch.label)}</b> <span class="small muted">(${esc(r.sub.name)})</span>
+    <div class="aspgrid">${r.ch.options.map(o => { const img = (c.aspectImgs || {})[r.ch.key + "|" + o], sp = spellsAt(r, o), on = o === r.pick;
+      return `<label class="aspect ${on ? "on" : ""}"><input type="radio" name="rc_${r.ch.key}" data-act="restChoice" data-k="${r.ch.key}" value="${esc(o)}" ${on ? "checked" : ""}>
+        <div class="asphead">${img ? `<img src="${img}">` : ""}<b>${esc(o)}</b>${on ? '<span class="chip acc">current</span>' : ""}</div>
+        ${r.ch.desc?.[o] ? `<div class="small">${esc(r.ch.desc[o])}</div>` : ""}
+        ${sp.length ? `<div class="small aspsp"><b>Spells:</b> ${sp.map(n => `<span class="chip">${esc(n)}</span>`).join("")}</div>` : ""}
+        ${r.ch.free?.[o] ? `<div class="small aspsp"><b>Free cast:</b> ${r.ch.free[o].map(esc).join(", ")} (1× per Long Rest)</div>` : ""}
+        ${r.ch.resist?.[o] && lvl(r) >= (r.ch.resistFrom || 0) ? `<div class="small aspsp"><b>Resistance:</b> ${r.ch.resist[o].map(esc).join(", ")}</div>` : ""}</label>`; }).join("")}</div></div>`).join("") + `</div>`;
+}
+// the picture for the current aspect (Lunar phase, Land type …) if you added one; otherwise the normal portrait
+function aspectPortrait(c, D) {
+  const m = c.aspectImgs || {}; if (!Object.keys(m).length) return "";
+  for (const r of D.restChoices || []) if (r.pick && m[r.ch.key + "|" + r.pick]) return m[r.ch.key + "|" + r.pick];
+  return "";
 }
 function mLongRest() {
   const D = derive(S.char);
@@ -598,6 +614,8 @@ const ACT = {
   img: el => pickImage(async (big, small) => { S.char[el.dataset.k] = big;
     if (el.dataset.k === "portrait") { S.char.thumbCrop = { cx: 0.5, cy: 0.3, z: 1 }; S.char.thumb = await makeThumb(big, S.char.thumbCrop); save(); render(); openCrop(true); return; }
     save(); render(); }),
+  aspImg: el => pickImage(async big => { (S.char.aspectImgs ||= {})[el.dataset.k] = big; save(); render(); }),
+  aspImgDel: el => { if (S.char.aspectImgs) delete S.char.aspectImgs[el.dataset.k]; save(); render(); },
   imgdel: el => { S.char[el.dataset.k] = ""; if (el.dataset.k === "portrait") { S.char.thumb = ""; delete S.char.thumbCrop; } save(); render(); },
   cropThumb: () => { if (S.char.portrait) openCrop(false); },
   cropSave: async () => { const m = S.modal, g = cropGeom(m); const crop = { cx: (CROP_V / 2 - g.ox) / g.dw, cy: (CROP_V / 2 - g.oy) / g.dh, z: m.z };

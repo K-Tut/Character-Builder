@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-25a";
+const APP_VERSION = "2026-11-25b";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -243,6 +243,16 @@ function renderBuilder() {
   ${i < TABS.length - 1 ? `<button class="right" data-act="tab" data-t="${TABS[i + 1][0]}">${TABS[i + 1][1]} →</button>` : `<button class="right" data-act="view" data-v="sheet">Done → Play sheet</button>`}</div>`;
 }
 
+// optional pictures for aspects you switch on a rest (Lunar phase, Land type, Vestige form …)
+function aspectImgEditor(c, D) {
+  const list = (D.restChoices || []).filter(r => r.ch.reset); if (!list.length) return "";
+  const m = c.aspectImgs || {};
+  return `<h3 style="margin-top:14px">Pictures for each aspect <span class="small muted" style="text-transform:none;font-weight:400">(optional)</span></h3>
+    <p class="small muted">The play sheet shows the picture of the aspect you chose on your last rest; without one it shows your normal portrait.</p>` + list.map(r => `<p style="margin:8px 0 4px"><b>${esc(r.ch.label)}</b> <span class="small muted">${esc(r.sub.name)}</span></p>
+    <div class="aspimgs">${r.ch.options.map(o => { const k = r.ch.key + "|" + o, img = m[k];
+      return `<div class="aspimg ${o === r.pick ? "on" : ""}">${img ? `<img src="${img}" data-act="aspImg" data-k="${esc(k)}" title="Change picture">` : `<button class="ghost aspadd" data-act="aspImg" data-k="${esc(k)}">＋ 🖼</button>`}
+        <span class="small">${esc(o)}</span>${img ? `<a href="#" class="small" data-act="aspImgDel" data-k="${esc(k)}">remove</a>` : ""}</div>`; }).join("")}</div>`).join("");
+}
 function bBasics(c, D) {
   const ph = c.phys;
   return bBuildsCard(c) + `<div class="grid g2">
@@ -261,6 +271,7 @@ function bBasics(c, D) {
     <div class="row"><button data-act="img" data-k="portrait">Upload portrait</button>${c.portrait ? `<button class="ghost" data-act="cropThumb">✂ Adjust thumbnail</button><button class="ghost" data-act="imgdel" data-k="portrait">Remove</button>` : ""}
       ${c.thumb ? `<span class="small muted">Thumbnail:</span><img src="${c.thumb}" style="width:48px;height:48px;border-radius:8px;object-fit:cover">` : ""}</div>
     <p class="small muted">Shown on the sheet and on page 1 of the PDF. A tall image (2:3) fits best.</p>
+    ${aspectImgEditor(c, D)}
   </div></div>
   <div class="card"><h3>Delete character</h3><div class="row"><span class="small muted">Removes this character on all synced devices. Tip: use Export .json on the Print/PDF page first if you want a backup.</span><button class="danger right" data-act="deleteChar">🗑 Delete ${esc(c.name)}</button></div></div>`;
 }
