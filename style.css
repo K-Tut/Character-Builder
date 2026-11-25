@@ -94,7 +94,7 @@ details > summary { cursor: pointer; }
 @media (max-width: 1150px) { .sheet { grid-template-columns: 260px minmax(0, 1fr); } .sheet > .col3 { grid-column: 1 / -1; } }
 @media (max-width: 760px) { .sheet { grid-template-columns: 1fr; } }
 .hero { display: flex; gap: 16px; align-items: stretch; }
-.heroimg { flex: none; width: 128px; min-height: 150px; align-self: stretch; border-radius: 12px; overflow: hidden; position: relative; background: var(--chip); }
+.heroimg { flex: none; width: auto; min-width: 128px; max-width: min(46%, 210px); aspect-ratio: 2 / 3; min-height: 150px; align-self: stretch; border-radius: 12px; overflow: hidden; position: relative; background: var(--chip); }
 .heroimg img { width: 100%; height: 100%; object-fit: cover; object-position: center 22%; display: block; cursor: zoom-in; }
 .heroimg.bloodied { animation: bloodpulse 1.8s ease-in-out infinite; }
 .heroimg.bloodied::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 45%, rgba(200,20,20,.55)); animation: bloodfade 1.8s ease-in-out infinite; }
@@ -162,9 +162,11 @@ details > summary { cursor: pointer; }
   .tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
   .tabs button { white-space: nowrap; }
   .hero { gap: 12px; }
-  .heroimg { width: 100px; min-height: 130px; }
+  .heroimg { min-width: 100px; min-height: 130px; max-width: 40%; }
   .hero h2 { font-size: clamp(16px, 5vw, 20px); }
   .heroact button { padding: 8px 6px; font-size: 12.5px; }
+  .herorow button { min-width: 0; padding: 8px 4px; overflow: hidden; text-overflow: ellipsis; }
+  .herorow button.heroexp { display: none; }
   .sheet .col1, .sheet .col2, .sheet .col3 { display: none; }
   .sheet.m-stats .col1, .sheet.m-combat .col2, .sheet.m-col3 .col3 { display: block; }
   .sheet.m-col3 .col3 .subtabs { display: none; }
