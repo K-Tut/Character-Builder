@@ -676,3 +676,4 @@ body.hasenergy main { padding-left: 46px; }
 .spfilter2 { display: flex; gap: 8px; margin: 6px 0 4px; flex-wrap: wrap; }
 .spfilter2 select { flex: 1; min-width: 130px; }
 .spfilter2 select.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.advmark.skbonus { color: var(--accent); }

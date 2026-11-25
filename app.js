@@ -264,7 +264,11 @@ function derive(c) {
   // jack of all trades
   const jack = (D.cls.bard || 0) >= 2 ? Math.floor(D.pb / 2) : 0;
   D.skill = {};
-  ALL_SKILLS.forEach(s => { const a = (c.skillAbil || {})[s] || SKILLS[s]; D.skill[s] = { v: D.mod[a] + (exp.has(s) ? 2 * D.pb : prof.has(s) ? D.pb : jack), p: prof.has(s), e: exp.has(s), a }; });
+  ALL_SKILLS.forEach(s => { const a = (c.skillAbil || {})[s] || SKILLS[s]; D.skill[s] = { v: D.mod[a] + (exp.has(s) ? 2 * D.pb : prof.has(s) ? D.pb : jack), p: prof.has(s), e: exp.has(s), a, bonus: [] }; });
+  // Thaumaturge (Cleric) / Magician (Druid): + Wisdom modifier (min. +1) to two Intelligence skills
+  const skillPlus = (skills, v, src) => skills.forEach(s => { D.skill[s].v += v; D.skill[s].bonus.push(`${sgn(v)} ${src}`); });
+  if (D.cls.cleric && picked("divineOrder").includes("Thaumaturge")) skillPlus(["Arcana", "Religion"], Math.max(1, D.mod.wis), "Thaumaturge (Wis)");
+  if (D.cls.druid && picked("primalOrder").includes("Magician")) skillPlus(["Arcana", "Nature"], Math.max(1, D.mod.wis), "Magician (Wis)");
   // languages: Common + 2 standard + class languages + Deft Explorer + extras
   const langs = ["Common"];
   const addL = l => { l = String(l || "").trim(); if (l && !langs.some(x => x.toLowerCase() === l.toLowerCase())) langs.push(l); };
