@@ -282,6 +282,7 @@ function sheetSpells(c, D) {
   c.spells.forEach(s => add(s.name, s.cls === "other" ? "Other" : CLASSES[s.cls]?.name || s.cls, false, s.level));
   let h = D.casters.map(cs => `<span class="chip acc roll" ${R(cs.name + " spell attack", cs.atk)}>${cs.name}: DC ${cs.dc} · Atk ${sgn(cs.atk)} 🎲</span>`).join("")
     + (D.speciesCast && D.alwaysSpells.some(s => s.cls === "species") ? `<span class="chip acc roll" ${R(D.speciesCast.name + " spell attack", D.speciesCast.atk)}>${esc(D.speciesCast.name)} spells: DC ${D.speciesCast.dc} · Atk ${sgn(D.speciesCast.atk)} (${ABBR[D.speciesCast.ability]}) 🎲</span>` : "") + `<button class="small ghost" data-act="goSpells" style="margin-left:6px">Change spells</button>`;
+  h += (D.featCasters || []).map(fc => `<span class="chip acc roll" ${R(fc.name + " spell attack", fc.atk)}>${esc(fc.name)}: DC ${fc.dc} · Atk ${sgn(fc.atk)} (${ABBR[fc.ability]}) 🎲</span>`).join("");
   if (D.slots.length || D.pact || D.spellPoints) h += `<div class="spslots"><h3 style="margin:10px 0 4px">${D.spellPoints ? "Spell points" : "Spell slots"}</h3>${slotRows(D, c.play)}</div>`;
   if (!Object.keys(groups).length) return h + `<p class="muted">No spells.</p>`;
   const F = S.ui.spf || "", FILT = [["", "All"], ["A", "Action"], ["BA", "Bonus action"], ["R", "Reaction"], ["rit", "Ritual"], ["conc", "Concentration"]];
@@ -776,7 +777,7 @@ const ACT = {
   }
 };
 // change-type actions (inputs/selects/checkboxes)
-Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT, BUILD_ACT);
+Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT, BUILD_ACT, FS_ACT);
 const CHG = {
   spMode: el => { S.char.spellPoints = el.value === "points"; },
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },
@@ -818,7 +819,7 @@ const CHG = {
   },
   popt: el => { const o = S.ui.print; o[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value; }
 };
-Object.assign(CHG, COMP_CHG, BUFF_CHG);
+Object.assign(CHG, COMP_CHG, BUFF_CHG, FS_CHG);
 
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el) return;

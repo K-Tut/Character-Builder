@@ -406,6 +406,11 @@ function derive(c) {
     for (const lv in src.spells) if (D.level >= +lv) src.spells[lv].forEach(n => { if (!D.alwaysSpells.some(s => s.name === n)) D.alwaysSpells.push({ name: n, cls: x.cls, src: src.name }); }); });
   const spSpells = { ...(sp?.spells || {}) }; for (const lv in spc.spells || {}) spSpells[lv] = [...(spSpells[lv] || []), ...spc.spells[lv]];
   for (const lv in spSpells) if (D.level >= +lv || (D.level === 0 && +lv === 1)) spSpells[lv].forEach(n => D.alwaysSpells.push({ name: n, cls: "species", src: sp.name + (c.species.choice ? " (" + c.species.choice + ")" : "") }));
+  // spells from feats (Magic Initiate, Fey Touched, Shadow Touched …)
+  D.featSpells = []; D.featCasters = [];
+  D.feats.forEach(f => { if (typeof FEAT_SPELLS === "undefined" || !FEAT_SPELLS[f.name]) return; const ab = f.picks?.abil || f.abil; if (!ab || !D.mod[ab]?.toString) return;
+    const name = f.name + (f.picks?.list ? " (" + f.picks.list + ")" : ""); if (!D.featCasters.some(x => x.name === name)) D.featCasters.push({ name, ability: ab, dc: 8 + D.pb + D.mod[ab], atk: D.pb + D.mod[ab] }); });
+  if (typeof featSpellsFor === "function") D.feats.forEach(f => featSpellsFor(f, D).forEach(s => { D.featSpells.push({ ...s, src: f.name }); if (!D.alwaysSpells.some(x => norm(x.name) === norm(s.name))) D.alwaysSpells.push({ name: s.name, cls: "feat", src: f.name + (f.picks?.list ? " (" + f.picks.list + ")" : "") }); }));
 
   // resources
   D.resources = [];
@@ -446,6 +451,7 @@ function derive(c) {
   if (picked("invocations").includes("Gift of the Depths")) addFree("Water Breathing", "Gift of the Depths", "Gift of the Depths");
   for (const k in D.subs) for (const lv in D.subs[k].freeCasts || {}) if (D.cls[k] >= +lv) D.subs[k].freeCasts[lv].forEach(n => addFree(n, D.subs[k].name, n));
   for (const r of D.restChoices || []) if (r.pick && r.ch.free?.[r.pick]) r.ch.free[r.pick].forEach(n => addFree(n, r.sub.name + " (" + r.pick + ")", r.ch.label));
+  (D.featSpells || []).forEach(s => { if (s.free) { const si = spellInfo(s.name); if (!si || si.level > 0) addFree(s.name, s.src, s.src); } });
   (c.freeCasts || []).forEach(n => addFree(n, "Added by you", n));
   // resources you added to a feature yourself
   for (const fk in c.featRes || {}) (c.featRes[fk] || []).forEach((r, i) => D.resources.push({ key: "fr_" + norm(fk).replace(/ /g, "_") + "_" + i, name: r.name || "Resource", max: +r.uses || 0, reset: r.reset || "LR", feature: r.feature || "", src: "Added by you", featKey: fk, idx: i, manual: true }));

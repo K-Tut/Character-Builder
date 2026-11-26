@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-25c";
+const APP_VERSION = "2026-11-26a";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -367,9 +367,8 @@ function featPicks(path, f, D) {
       h += `</div><div><b class="small">${p.label}</b> <span class="muted small">${cur.length}/${p.count}</span><div class="checks">${opts.map(o => `<label><input type="checkbox" data-act="featMulti" data-p="${path}" data-k="${p.key}" data-n="${p.count}" data-v="${esc(o)}" ${cur.includes(o) ? "checked" : ""} ${!cur.includes(o) && cur.length >= p.count ? "disabled" : ""}>${esc(o)}</label>`).join("")}</div></div><div class="row">`;
     } else h += `<label>${p.label}: ${sel(path + ".picks." + p.key, f.picks?.[p.key], opts.map(o => [o, ABILITY_NAMES[o] || o]), { blank: "—" })}</label>`;
   }
-  if (fd.spellsNote) h += `<span class="small muted">Spells: ${fd.spellsNote} — add them in the Spells tab under "Other".</span>`;
-  if (f.name === "Magic Initiate") h += `<span class="small muted">Add 2 cantrips + one level 1 spell in the Spells tab under "Other".</span>`;
-  return h + `</div>`;
+  if (fd.spellsNote && !FEAT_SPELLS[f.name]) h += `<span class="small muted">Spells: ${fd.spellsNote} — add them in the Spells tab under "Other".</span>`;
+  return h + `</div>` + featSpellUI(path, f, D);
 }
 
 function poolOptions(pk, D) {
@@ -588,7 +587,7 @@ function bSpells(c, D) {
     h += `<div class="row"><span class="chip ${nC > cs.cantrips ? "acc" : ""}">Cantrips ${nC} / ${cs.cantrips}</span><span class="chip ${nP > cs.prepared ? "acc" : ""}">Prepared spells ${nP} / ${cs.prepared}</span>
       <span class="chip">Max spell level ${cs.maxLvl}</span><span class="chip">Save DC ${cs.dc} · Attack ${sgn(cs.atk)} (${ABILITY_NAMES[cs.ability]})</span></div>`;
   } else h += `<p class="small muted">Spells from feats (Magic Initiate, Fey Touched…), items or other sources. Pick from any list.</p>`;
-  const always = D.alwaysSpells.filter(s => s.cls === cur || (cur === "other" && s.cls === "species"));
+  const always = D.alwaysSpells.filter(s => s.cls === cur || (cur === "other" && (s.cls === "species" || s.cls === "feat")));
   if (always.length) h += `<p><b>Always prepared:</b> ${always.map(s => `<span class="chip">${esc(s.name)}</span>`).join("")}</p>`;
   h += `<p><b>Chosen:</b> ${mine.map(s => `<span class="chip acc">${esc(s.name)} <a href="#" data-act="spellDel" data-n="${esc(s.name)}" data-c="${cur}">✕</a></span>`).join("") || '<span class="muted">none</span>'}</p>`;
   const schools = [...new Set(S.idx.spellList.map(s => s.school).filter(Boolean))].sort(), fsch = S.ui.spSchools || [];

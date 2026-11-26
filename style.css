@@ -693,3 +693,11 @@ body.hasenergy main { padding-left: 46px; }
 .aspimg { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 84px; text-align: center; }
 .aspimg img, .aspimg .aspadd { width: 72px; height: 96px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent; padding: 0; }
 .aspimg.on img, .aspimg.on .aspadd { border-color: var(--accent); }
+/* spells chosen inside a feat */
+.featspells { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(128,128,128,.08); }
+.fsrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.fslist { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; margin-top: 4px; }
+.fsopt { padding: 5px 0; border-bottom: 1px dashed var(--line); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.fsopt label { flex: 1; min-width: 0; }
+.fsopt.on b { color: var(--accent); }
+.fsopt .desc { width: 100%; }
