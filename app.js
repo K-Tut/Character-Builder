@@ -282,12 +282,13 @@ function derive(c) {
   if (D.cls.cleric && picked("divineOrder").includes("Thaumaturge")) skillPlus(["Arcana", "Religion"], Math.max(1, D.mod.wis), "Thaumaturge (Wis)");
   if (D.cls.druid && picked("primalOrder").includes("Magician")) skillPlus(["Arcana", "Nature"], Math.max(1, D.mod.wis), "Magician (Wis)");
   // languages: Common + 2 standard + class languages + Deft Explorer + extras
-  const langs = ["Common"];
-  const addL = l => { l = String(l || "").trim(); if (l && !langs.some(x => x.toLowerCase() === l.toLowerCase())) langs.push(l); };
-  picked("langOrigin").slice(0, 2).forEach(addL);
-  for (const k in D.cls) if (CLASS_LANGS[k]) addL(CLASS_LANGS[k]);
-  picked("langDeft").slice(0, D.pools.langDeft?.max || 0).forEach(addL);
-  String(c.langExtra || "").split(/[,;]/).forEach(addL);
+  const langs = ["Common"]; D.langFrom = { Common: "everyone" };
+  const addL = (l, src) => { l = String(l || "").trim(); if (l && !langs.some(x => x.toLowerCase() === l.toLowerCase())) { langs.push(l); D.langFrom[l] = src; } };
+  picked("langOrigin").slice(0, 2).forEach(l => addL(l, "origin"));
+  for (const k in D.cls) if (CLASS_LANGS[k]) addL(CLASS_LANGS[k], CLASSES[k].name);
+  picked("langDeft").slice(0, D.pools.langDeft?.max || 0).forEach(l => addL(l, "Ranger: Deft Explorer"));
+  picked("langRogue").slice(0, D.pools.langRogue?.max || 0).forEach(l => addL(l, "Rogue: Thieves' Cant"));
+  String(c.langExtra || "").split(/[,;]/).forEach(l => addL(l, "added by you"));
   D.languages = langs;
   D.skillAdv = typeof skillAdvantages === "function" ? skillAdvantages(c, D) : {};
   D.passive = { perception: 10 + D.skill.Perception.v, insight: 10 + D.skill.Insight.v, investigation: 10 + D.skill.Investigation.v };

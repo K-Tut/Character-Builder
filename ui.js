@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-27g";
+const APP_VERSION = "2026-11-27h";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -263,7 +263,8 @@ function bBasics(c, D) {
     <h3 style="margin-top:14px">Physical</h3>
     <div class="grid g3">${[["age", "Age"], ["height", "Height"], ["weight", "Weight"], ["eyes", "Eyes"], ["hair", "Hair"], ["skin", "Skin"], ["alignment", "Alignment"]].map(([k, l]) => `<label>${l}<br>${inp("phys." + k, ph[k], { style: "width:100%" })}</label>`).join("")}</div>
     <h3 style="margin-top:14px">Languages</h3>
-    <p style="margin:4px 0">You know: <b>${esc((D.languages || ["Common"]).join(", "))}</b></p>
+    <p style="margin:4px 0">You know: ${(D.languages || ["Common"]).map(l => `<span class="chip">${esc(l)} <span class="muted small">· ${esc((D.langFrom || {})[l] || "")}</span></span>`).join(" ")}</p>
+    <p class="small muted" style="margin:2px 0 6px">2024 rules: everyone knows Common + 2 standard languages (chosen here). Some classes add more — Rogue (Thieves' Cant + 1), Druid (Druidic), Ranger level 2 (Deft Explorer: 2) — those are picked in Class &amp; Levels. Anything from your DM, a feat or an item goes into "Other languages".</p>
     ${poolPicker("langOrigin", D, c)}
     <label class="small">Other languages (from your DM, feats, items…)<br>${inp("langExtra", c.langExtra || "", { style: "width:100%", ph: "e.g. Sylvan, Infernal" })}</label>
     <label>Other proficiencies / notes<br>${inp("otherProfs", c.otherProfs, { style: "width:100%" })}</label>
@@ -394,7 +395,7 @@ function poolOptions(pk, D) {
 }
 function poolLabel(pk) { return pk.startsWith("skills:") ? CLASSES[pk.slice(7)].name + " skill proficiencies" : POOLS[pk]?.label || pk; }
 const POOLS_WITH_INFO = new Set(["plans", "armorModel", "invocations", "metamagic", "maneuvers", "runes", "fightingStyle", "divineOrder", "primalOrder", "mastery"]);
-const LANG_POOLS = new Set(["langOrigin", "langDeft"]);
+const LANG_POOLS = new Set(["langOrigin", "langDeft", "langRogue"]);
 function optChoiceUI(pk, o, c, D) {
   const spec = OPTION_CHOICES[o]; if (!spec) return "";
   const key = pk + "|" + o, ch = (c.optChoices || {})[key] || {}, path = "optChoices." + key;

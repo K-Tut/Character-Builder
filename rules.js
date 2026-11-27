@@ -661,6 +661,9 @@ POOLS.langOrigin = { label: "Languages (choose 2 standard languages)", options: 
 POOLS.langDeft = { label: "Deft Explorer languages", options: () => LANG_STANDARD.concat(LANG_RARE) };
 CLASSES.ranger.pools.langDeft = step({ 2: 2 });
 const CLASS_LANGS = { rogue: "Thieves' Cant", druid: "Druidic" };
+// 2024 Rogue: Thieves' Cant + one other language of your choice
+POOLS.langRogue = { label: "Thieves' Cant: one more language", options: () => LANG_STANDARD.concat(LANG_RARE) };
+CLASSES.rogue.pools = { ...(CLASSES.rogue.pools || {}), langRogue: step({ 1: 1 }) };
 
 // ---------- extra choices that come with certain options ----------
 const OPTION_CHOICES = {

@@ -298,6 +298,7 @@ POOLS.genieKind = { label: "Genie kind", options: () => ["Dao (Earth)", "Djinni 
 POOLS.divineAffinity = { label: "Divine Magic affinity", options: () => ["Good (Cure Wounds)", "Evil (Inflict Wounds)", "Law (Bless)", "Chaos (Bane)", "Neutrality (Protection from Evil and Good)"] };
 POOLS.langOrigin = { label: "Languages (choose 2 — standard; rare and other languages if your DM allows)", options: () => LANG_STANDARD.concat(LANG_RARE, ["Druidic", "Thieves' Cant"], LANG_EXOTIC) };
 POOLS.langDeft.options = () => LANG_STANDARD.concat(LANG_RARE, LANG_EXOTIC);
+if (POOLS.langRogue) POOLS.langRogue.options = () => LANG_STANDARD.concat(LANG_RARE, LANG_EXOTIC);
 // Aasimar: the Celestial Revelation form is picked each time it is used (on the sheet), not when building
 delete SPECIES.aasimar.choice;
 SPECIES.aasimar.resources.find(r => r.key === "revelation").forms = ["Heavenly Wings", "Inner Radiance", "Necrotic Shroud"];
