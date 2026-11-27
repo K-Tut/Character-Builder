@@ -710,3 +710,7 @@ body.hasenergy main { padding-left: 46px; }
 .fpstar { padding: 2px 8px; font-size: 12px; white-space: nowrap; }
 .fpstar.on { color: var(--accent); border-color: var(--accent); }
 .fpchosen { padding: 6px 0; }
+.featgen { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(128,128,128,.08); }
+.genrow { margin-top: 6px; gap: 6px; align-items: center; }
+.genlbl { min-width: 120px; }
+.gensel { max-width: 180px; }

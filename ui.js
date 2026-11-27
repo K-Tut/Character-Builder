@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-27e";
+const APP_VERSION = "2026-11-27f";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -383,7 +383,7 @@ function featPicks(path, f, D) {
     } else h += `<label>${p.label}: ${sel(path + ".picks." + p.key, f.picks?.[p.key], opts.map(o => [o, ABILITY_NAMES[o] || o]), { blank: "—" })}</label>`;
   }
   if (fd.spellsNote && !FEAT_SPELLS[f.name]) h += `<span class="small muted">Spells: ${fd.spellsNote} — add them in the Spells tab under "Other".</span>`;
-  return h + `</div>` + featSpellUI(path, f, D);
+  return h + `</div>` + featSpellUI(path, f, D) + featProfUI(path, f, D);
 }
 
 function poolOptions(pk, D) {

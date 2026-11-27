@@ -170,7 +170,7 @@ function allFeats(c) {
     const m = bg.feat.match(/^(.*?)\s*\((.*)\)$/);
     const name = m ? m[1] : bg.feat;
     const picks = { ...(c.bgFeat.picks || {}) }; if (m) picks.list = m[2];
-    out.push({ name, picks, src: "Background (" + bg.name + ")", origin: true });
+    out.push({ name, picks, src: "Background (" + bg.name + ")", origin: true, path: "bgFeat" });
   }
   return out.concat(restFeats(c));
 }
@@ -178,13 +178,13 @@ function restFeats(c) {
   const out = [];
   for (const key in c.optChoices || {}) {
     const [pk, opt] = key.split("|"); const ch = c.optChoices[key];
-    if (ch && ch.feat && ch.feat.name && (c.pools[pk] || []).includes(opt)) out.push({ ...ch.feat, src: opt });
+    if (ch && ch.feat && ch.feat.name && (c.pools[pk] || []).includes(opt)) out.push({ ...ch.feat, src: opt, path: "optChoices." + key + ".feat" });
   }
-  if (SPECIES[c.species.id]?.extraOriginFeat && c.speciesFeat?.name) out.push({ ...c.speciesFeat, src: "Species (Versatile)", origin: true });
+  if (SPECIES[c.species.id]?.extraOriginFeat && c.speciesFeat?.name) out.push({ ...c.speciesFeat, src: "Species (Versatile)", origin: true, path: "speciesFeat" });
   c.levels.forEach((lv, i) => {
-    if (lv.asi?.mode === "feat" && lv.asi.feat?.name) out.push({ ...lv.asi.feat, src: CLASSES[lv.cls].name + " lvl " + classLevelAt(c, i) });
+    if (lv.asi?.mode === "feat" && lv.asi.feat?.name) out.push({ ...lv.asi.feat, src: CLASSES[lv.cls].name + " lvl " + classLevelAt(c, i), path: "levels." + i + ".asi.feat" });
   });
-  (c.bonusFeats || []).forEach(f => { if (f && f.name) out.push({ ...f, src: "Extra feat" }); });
+  (c.bonusFeats || []).forEach((f, i) => { if (f && f.name) out.push({ ...f, src: "Extra feat", path: "bonusFeats." + i }); });
   return out;
 }
 function classLevelAt(c, i) { let n = 0; for (let j = 0; j <= i; j++) if (c.levels[j].cls === c.levels[i].cls) n++; return n; }
@@ -255,6 +255,8 @@ function derive(c) {
     if (fd.allSkills) ALL_SKILLS.forEach(s => prof.add(s));
     if (fd.allSkills && f.picks?.expert) featExp.push(f.picks.expert);
   });
+  // proficiencies you entered in a feat yourself (Build → the feat → "Proficiencies from this feat")
+  D.feats.forEach(f => { const g = f.picks?.gen; if (!g) return; (g.skills || []).forEach(s => prof.add(s)); (g.tools || []).forEach(t => tools.add(t)); (g.expertise || []).forEach(s => featExp.push(s)); });
   // Keen Mind / Observant: proficiency in the chosen skill, or Expertise if you already have it
   D.feats.forEach(f => { const s = f.picks?.lore || f.picks?.keen; if (!s) return; if (prof.has(s)) featExp.push(s); else prof.add(s); });
   D.profSkills = ALL_SKILLS.filter(s => prof.has(s));
@@ -266,7 +268,7 @@ function derive(c) {
 
   // saves
   D.saveProf = new Set(D.startCls ? CLASSES[D.startCls].saves : []);
-  D.feats.forEach(f => { if (FEATS[f.name]?.saveFromAbil && f.abil) D.saveProf.add(f.abil); });
+  D.feats.forEach(f => { if (FEATS[f.name]?.saveFromAbil && f.abil) D.saveProf.add(f.abil); (f.picks?.gen?.saves || []).forEach(a => D.saveProf.add(a)); });
   D.save = {}; ABILITIES.forEach(a => D.save[a] = D.mod[a] + (D.saveProf.has(a) ? D.pb : 0));
 
   // jack of all trades

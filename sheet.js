@@ -515,7 +515,7 @@ function aspectPortrait(c, D) {
 }
 function mLongRest() {
   const D = derive(S.char);
-  return `<h2>Long rest</h2><p>Restores HP, Hit Dice, spell slots and all uses.</p>${restChoiceUI(D, "LR")}
+  return `<h2>Long rest</h2><p>Restores HP, Hit Dice, spell slots and all uses.</p>${restChoiceUI(D, "LR")}${lrFeatUI(D)}
    <div class="foot"><button class="ghost" data-act="modalClose">Cancel</button><button data-act="lrFinish">Finish long rest</button></div>`;
 }
 
@@ -669,7 +669,7 @@ const ACT = {
   insp: () => { S.char.play.inspiration = !S.char.play.inspiration; save(); render(); },
   showHidden: () => { S.ui.showHidden = !S.ui.showHidden; render(); },
   longRest: () => {
-    if (restChoiceList(derive(S.char), "LR").length) return openModal({ type: "longRest" });
+    { const D = derive(S.char); if (restChoiceList(D, "LR").length || lrFeats(D).length) return openModal({ type: "longRest" }); }
     if (!confirm("Take a long rest? Restores HP, hit dice, spell slots and all uses.")) return;
     ACT.lrFinish();
   },
@@ -778,7 +778,7 @@ const ACT = {
   }
 };
 // change-type actions (inputs/selects/checkboxes)
-Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT, BUILD_ACT, FS_ACT, GIT_ACT, FT_ACT);
+Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT, BUILD_ACT, FS_ACT, GIT_ACT, FT_ACT, GEN_ACT);
 const CHG = {
   spMode: el => { S.char.spellPoints = el.value === "points"; },
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },
@@ -820,7 +820,7 @@ const CHG = {
   },
   popt: el => { const o = S.ui.print; o[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value; }
 };
-Object.assign(CHG, COMP_CHG, BUFF_CHG, FS_CHG);
+Object.assign(CHG, COMP_CHG, BUFF_CHG, FS_CHG, GEN_CHG);
 
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el) return;
