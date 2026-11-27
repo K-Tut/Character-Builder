@@ -431,6 +431,13 @@ function choiceText(ch, opt) {
 FEATS["Purple Dragon Commandant"] = { ...(FEATS["Purple Dragon Commandant"] || {}), cat: "general", abil: ["str", "dex"],
   res: { name: "Encourage Ally", reset: "LR", n: (l, c) => c.pb, note: "Bonus Action: ally gains 2d6 + mod Temp HP" } };
 
+// Heroes of Faerûn feats with choices (grant: "prof" = proficiency, "exp" = Expertise; lr = picked again after each Long Rest)
+FEATS["Purple Dragon Rook"] = { ...(FEATS["Purple Dragon Rook"] || {}), cat: "origin", src: "Heroes of Faerûn",
+  picks: [{ key: "entreat", label: "Entreat (skill proficiency)", opts: ["Insight", "Performance", "Persuasion"], grant: "prof" }],
+  res: { name: "Rallying Cry", reset: "LR", n: () => 1, note: "on Initiative: PB creatures within 30 ft gain Heroic Inspiration" } };
+FEATS["Zhentarim Tactics"] = { ...(FEATS["Zhentarim Tactics"] || {}), cat: "general", src: "Heroes of Faerûn", abil: ["dex", "cha"],
+  picks: [{ key: "merc", label: "Versatile Merc (Expertise until your next Long Rest)", opts: "profSkills", grant: "exp", lr: true }] };
+
 // Bonus dice on checks from feats/features. skills: skill names; abilities: ability check names ("Charisma").
 const CHECK_BONUS = [
   { feat: "Arcane Eloquence", skills: ["Deception", "Intimidation", "Persuasion"], n: 1, s: 4, label: "Smooth Talker" }

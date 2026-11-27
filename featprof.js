@@ -22,12 +22,15 @@ function featProfUI(path, f, D, compact) {
 function genGet(path) { const t = target(); let o = t; for (const k of path.split(".")) { if (o == null) return null; o = o[k]; } return o; }
 function genObj(path) { const f = genGet(path); if (!f) return null; f.picks ||= {}; return (f.picks.gen ||= {}); }
 // feats whose proficiencies change on a Long Rest
-function lrFeats(D) { return (D.feats || []).filter(f => f.picks?.gen?.lr && f.path); }
+function lrPicks(f) { return (FEATS[f.name]?.picks || []).filter(p => p.lr); }
+function lrFeats(D) { return (D.feats || []).filter(f => f.path && (f.picks?.gen?.lr || lrPicks(f).length)); }
 function lrFeatUI(D) {
   const list = lrFeats(D); if (!list.length) return "";
   return `<div class="card" style="margin:10px 0"><h3 style="margin-top:0">Feat proficiencies for the next day</h3>` + list.map(f => `<div style="margin:6px 0 12px"><b>${esc(f.name)}</b> <span class="small muted">(${esc(f.src)})</span>
     ${S.ui.featInfo === "lr" + f.path ? `<div class="desc small">${para(featDesc(f.name)) || '<span class="muted">No description imported.</span>'}</div>` : ""}
-    <a href="#" class="small" data-act="featInfoTog" data-id="lr${esc(f.path)}" data-v="${esc(f.name)}">${S.ui.featInfo === "lr" + f.path ? "▾ hide feat text" : "▸ what does this feat say?"}</a>${featProfUI(f.path, f, D, true)}</div>`).join("") + `</div>`;
+    <a href="#" class="small" data-act="featInfoTog" data-id="lr${esc(f.path)}" data-v="${esc(f.name)}">${S.ui.featInfo === "lr" + f.path ? "▾ hide feat text" : "▸ what does this feat say?"}</a>
+    ${lrPicks(f).map(p => `<div class="row" style="margin-top:6px"><label class="small">${esc(p.label)}: ${sel(f.path + ".picks." + p.key, f.picks?.[p.key] || "", pickOpts(p.opts, D).map(o => [o, ABILITY_NAMES[o] || o]), { blank: "— choose —" })}</label></div>`).join("")}
+    ${f.picks?.gen?.lr ? featProfUI(f.path, f, D, true) : ""}</div>`).join("") + `</div>`;
 }
 const GEN_ACT = {
   genOpen: el => { S.ui.genOpen = el.dataset.k; S.modal ? renderModal() : render(); },

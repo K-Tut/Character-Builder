@@ -118,7 +118,7 @@ function normSource(x) {
 function featCatalog() {
   if (S.idx.feats) return S.idx.feats;
   const map = {};
-  for (const [n, fd] of Object.entries(FEATS)) map[norm(n)] = { name: n, cat: fd.cat, abil: fd.abil || null, source: "Player's Handbook", builtin: true };
+  for (const [n, fd] of Object.entries(FEATS)) map[norm(n)] = { name: n, cat: fd.cat, abil: fd.abil || null, source: fd.src || "Player's Handbook", builtin: true };
   for (const p of S.idx.pages.feat || []) {
     if (/:all$/.test(p.slug) || /\ball\b/i.test(p.title)) continue;
     const page = S.wiki.pages[p.slug]; const t = page.text || "";
@@ -255,6 +255,8 @@ function derive(c) {
     if (fd.allSkills) ALL_SKILLS.forEach(s => prof.add(s));
     if (fd.allSkills && f.picks?.expert) featExp.push(f.picks.expert);
   });
+  // feat picks that grant a proficiency or Expertise (Purple Dragon Rook, Zhentarim Tactics …)
+  D.feats.forEach(f => (FEATS[f.name]?.picks || []).forEach(pk => { const v = f.picks?.[pk.key]; if (!v || !pk.grant) return; if (pk.grant === "prof") prof.add(v); else if (pk.grant === "exp") featExp.push(v); }));
   // proficiencies you entered in a feat yourself (Build → the feat → "Proficiencies from this feat")
   D.feats.forEach(f => { const g = f.picks?.gen; if (!g) return; (g.skills || []).forEach(s => prof.add(s)); (g.tools || []).forEach(t => tools.add(t)); (g.expertise || []).forEach(s => featExp.push(s)); });
   // Keen Mind / Observant: proficiency in the chosen skill, or Expertise if you already have it
