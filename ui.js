@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-27c";
+const APP_VERSION = "2026-11-27d";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -631,7 +631,7 @@ function spellList(c, D, cur, cs) {
   const groups = {}; list.slice(0, 400).forEach(s => (groups[s.level] ||= []).push(s));
   return filt + Object.entries(groups).map(([lv, ss]) => `<h4 style="margin:10px 0 4px">${+lv ? "Level " + lv : "Cantrips"}</h4>` + ss.map(s => `
     <div class="spell"><div class="h"><input type="checkbox" data-act="spellToggle" data-n="${esc(s.name)}" data-l="${s.level}" data-c="${cur}" ${chosen.has(s.name) ? "checked" : ""}>
-    <b data-act="toggleOpen" style="flex:1">${esc(s.name)}</b>${s.custom ? '<span class="tag own">★ own</span>' : ""}<span class="tag">${esc(s.school)}</span>${s.conc ? '<span class="tag">C</span>' : ""}${s.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.time)}</span></div>
+    <b data-act="toggleOpen" style="flex:1">${esc(s.name)}</b>${s.custom ? '<span class="tag own">★ own</span>' : ""}${s.legacy && s.source ? `<span class="tag" title="${esc(s.source)} (2014 rules)">${esc(s.source.replace(/:.*$/, "").replace(/^(Xanathar|Tasha|Fizban)'?s.*$/, "$1's"))}</span>` : ""}<span class="tag">${esc(s.school)}</span>${s.conc ? '<span class="tag">C</span>' : ""}${s.ritual ? '<span class="tag">R</span>' : ""}<span class="muted small">${esc(s.time)}</span></div>
     <div class="body hidden"><div class="meta">${esc([s.time && "Casting time: " + s.time, s.range && "Range: " + s.range, s.comp && "Components: " + s.comp, s.dur && "Duration: " + s.dur].filter(Boolean).join(" · "))}</div><div class="desc">${para(s.text)}</div>
     <div class="row" style="margin-top:6px"><button class="small ghost" data-act="spCopy" data-n="${esc(s.name)}">⧉ Copy &amp; edit as my own spell</button>${s.custom ? `<button class="small ghost" data-act="spEdit" data-n="${esc(s.name)}">✎ Edit</button>` : ""}</div></div></div>`).join("")).join("");
 }
