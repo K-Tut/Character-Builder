@@ -100,6 +100,8 @@ const GitSync = {
   window.addEventListener("online", () => GitSync.soon(500));
   setInterval(() => { if (document.visibilityState === "visible" && Date.now() - GitSync.last > 90000) GitSync.run(); }, 20000);
   setTimeout(() => GitSync.soon(800), 1500);
+  // a locked sync setup next to the app (gitsync.enc) → offer "connect with a password"
+  fetch("gitsync.enc", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(e => { if (e && e.format === "dnd-builder-gitsync-v1") { S.ui.gitEnc = e; if (S.view === "home" && !GitSync.enabled()) render(); } }).catch(() => { });
 })();
 
 function gitSyncCard() {
@@ -108,8 +110,14 @@ function gitSyncCard() {
     <h3>GitHub sync <span class="chip">optional</span></h3>
     <p class="small">Keeps your characters (with their pictures) in a GitHub repo, so your phone, iPad and anyone you give access see the same characters. Use a <b>private</b> repo and a token that can only reach that repo.</p>
     ${on ? `<p>Sync is <b>on</b> → <b>${esc(c.repo)}</b> <span class="small muted">(${esc(GitSync.folder())}/, branch ${esc(GitSync.branch())})</span><br><span class="small" id="gitstatus">${esc(GitSync.msg || GitSync.status)}</span></p>
-      <div class="row"><button data-act="gitNow">Sync now</button><button class="ghost" data-act="gitEdit">Change settings</button><button class="ghost" data-act="gitOff">Turn off</button></div>`
-    : `<div class="grid g2">
+      <div class="row"><button data-act="gitNow">Sync now</button><button class="ghost" data-act="gitEdit">Change settings</button><button class="ghost" data-act="gitOff">Turn off</button></div>
+      <details class="small" style="margin-top:10px"><summary><b>🔒 Other devices: connect with just a password</b></summary>
+        <p>Makes <code>gitsync.enc</code> — the repo name and token, locked with a password. Put it into the app's own GitHub repo (next to <code>wiki.enc</code>, or send it to Claude to upload). Then on any other device you only type the password in this card. Choose a strong password: the file is public, only the password protects the token.</p>
+        <div class="row"><input id="git_pw" type="password" placeholder="Password" autocomplete="new-password"><button class="small" data-act="gitMakeEnc">Create gitsync.enc</button></div></details>`
+    : `${S.ui.gitEnc ? `<div class="lvl" style="margin-bottom:10px"><b>Quick connect</b> <span class="small muted">— this app has a locked sync setup; type its password</span>
+        <div class="row" style="margin-top:6px"><input id="git_unlock" type="password" placeholder="Password" autocomplete="current-password"><button data-act="gitUnlock">Unlock &amp; sync</button></div></div>
+        <p class="small muted">…or enter the details yourself:</p>` : ""}
+      <div class="grid g2">
         <label>Repository (owner/name)<br><input id="git_repo" value="${esc(c.repo || "")}" placeholder="K-Tut/dnd-characters" style="width:100%"></label>
         <label>Access token<br><input id="git_token" type="password" value="${esc(c.token || "")}" placeholder="github_pat_…" style="width:100%" autocomplete="off"></label>
         <label>Branch<br><input id="git_branch" value="${esc(c.branch || "main")}" style="width:100%"></label>
@@ -118,7 +126,7 @@ function gitSyncCard() {
       ${GitSync.status === "error" ? `<p class="warn small">${esc(GitSync.msg)}</p>` : ""}
       <details class="small" style="margin-top:8px"><summary>How do I get a token?</summary>
         <ol><li>On github.com create a new <b>private</b> repository, e.g. <i>dnd-characters</i> (tick “Add a README” so it isn't empty).</li>
-        <li>Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token.</li>
+        <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener"><b>github.com/settings/personal-access-tokens/new</b></a> (signed in). On a phone it's easier on a laptop or in “desktop site” mode. (Same place by hand: your profile picture → Settings → at the very bottom of the left menu “Developer settings” → Personal access tokens → Fine-grained tokens.)</li>
         <li>Repository access: <b>Only select repositories</b> → your characters repo. Permissions → Repository → <b>Contents: Read and write</b>. Pick an expiry date.</li>
         <li>Copy the token and paste it here — on each of your devices. It stays on the device and is never put into the app's code.</li></ol>
         <p>Anyone you give the token to can read and change the characters in that repo.</p></details>`}
@@ -131,6 +139,18 @@ const GIT_ACT = {
     if (!/^[\w.-]+\/[\w.-]+$/.test(cfg.repo.replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, ""))) return toast("Repository must look like owner/name");
     if (!cfg.token) return toast("Paste your access token");
     GitSync.saveCfg(cfg); render(); await GitSync.run(); if (GitSync.status === "error") { GitSync.saveCfg({ ...cfg, on: false }); } render();
+  },
+  gitMakeEnc: async () => {
+    const pw = (document.getElementById("git_pw")?.value || ""); if (pw.length < 8) return toast("Use a password with at least 8 characters");
+    const c = GitSync.cfg(); const txt = (await WikiLock.encrypt({ repo: c.repo, token: c.token, branch: c.branch, folder: c.folder }, pw)).replace("dnd-builder-wiki-v1", "dnd-builder-gitsync-v1");
+    if (typeof shareFile === "function") await shareFile("gitsync.enc", txt, "gitsync.enc");
+    else { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt])); a.download = "gitsync.enc"; a.click(); }
+    toast("Saved gitsync.enc — upload it to the app's GitHub repo");
+  },
+  gitUnlock: async () => {
+    const pw = document.getElementById("git_unlock")?.value || ""; if (!pw) return;
+    let cfg; try { cfg = await WikiLock.decrypt(S.ui.gitEnc, pw); } catch (e) { return toast("Wrong password"); }
+    GitSync.saveCfg({ ...cfg, on: true }); render(); toast("Connected — syncing…"); await GitSync.run(); render();
   },
   gitNow: async () => { await GitSync.run(); render(); },
   gitEdit: () => { GitSync.saveCfg({ ...GitSync.cfg(), on: false }); GitSync.setStatus("off"); render(); },
