@@ -101,7 +101,8 @@ const GitSync = {
   setInterval(() => { if (document.visibilityState === "visible" && Date.now() - GitSync.last > 90000) GitSync.run(); }, 20000);
   setTimeout(() => GitSync.soon(800), 1500);
   // a locked sync setup next to the app (gitsync.enc) → offer "connect with a password"
-  fetch("gitsync.enc", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(e => { if (e && e.format === "dnd-builder-gitsync-v1") { S.ui.gitEnc = e; if (S.view === "home" && !GitSync.enabled()) render(); } }).catch(() => { });
+  // (phones sometimes save it as gitsync.enc.json — both names work)
+  fetch("gitsync.enc", { cache: "no-store" }).then(r => r.ok ? r : fetch("gitsync.enc.json", { cache: "no-store" })).then(r => r.ok ? r.json() : null).then(e => { if (e && e.format === "dnd-builder-gitsync-v1") { S.ui.gitEnc = e; if (S.view === "home" && !GitSync.enabled()) render(); } }).catch(() => { });
 })();
 
 function gitSyncCard() {
@@ -143,7 +144,7 @@ const GIT_ACT = {
   gitMakeEnc: async () => {
     const pw = (document.getElementById("git_pw")?.value || ""); if (pw.length < 8) return toast("Use a password with at least 8 characters");
     const c = GitSync.cfg(); const txt = (await WikiLock.encrypt({ repo: c.repo, token: c.token, branch: c.branch, folder: c.folder }, pw)).replace("dnd-builder-wiki-v1", "dnd-builder-gitsync-v1");
-    if (typeof shareFile === "function") await shareFile("gitsync.enc", txt, "gitsync.enc");
+    if (typeof shareFile === "function") await shareFile("gitsync.enc", txt, "gitsync.enc", "application/octet-stream");
     else { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt])); a.download = "gitsync.enc"; a.click(); }
     toast("Saved gitsync.enc — upload it to the app's GitHub repo");
   },

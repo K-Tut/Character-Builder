@@ -524,8 +524,8 @@ function applyFeatPick(p, v) {
 }
 // ---------- EVENTS ----------
 // save a file: share sheet on phones, download on computers
-async function shareFile(name, text, title) {
-  const file = new File([text], name, { type: "application/json" });
+async function shareFile(name, text, title, type = "application/json") {
+  const file = new File([text], name, { type });
   if (navigator.canShare && /Android|iPhone|iPad/i.test(navigator.userAgent) && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title }); return; } catch (e) { if (e.name === "AbortError") return; }
   }
