@@ -246,13 +246,21 @@ function derive(c) {
   (sp?.skills || []).forEach(s => prof.add(s));
   for (const k in D.subs) (D.subs[k].skills || []).forEach(s => prof.add(s));
   for (const k in D.pools) if (k.startsWith("skills:") || k === "skillsLore" || k === "keenSenses" || k === "skillful" || k === "primalKnowledge" || k === "spSkills" || POOLS[k]?.skill) picked(k).slice(0, D.pools[k].max).forEach(s => prof.add(s));
+  const featExp = [];
   D.feats.forEach(f => {
+    const fd = FEATS[f.name] || {};
     if (f.name === "Skilled") (f.picks?.skills || []).forEach(s => SKILLS[s] ? prof.add(s) : tools.add(s));
     if (f.name === "Skill Expert" && f.picks?.skill) prof.add(f.picks.skill);
+    (f.picks?.tools || []).forEach(t => tools.add(t)); (fd.tools || []).forEach(t => tools.add(t));
+    if (fd.allSkills) ALL_SKILLS.forEach(s => prof.add(s));
+    if (fd.allSkills && f.picks?.expert) featExp.push(f.picks.expert);
   });
+  // Keen Mind / Observant: proficiency in the chosen skill, or Expertise if you already have it
+  D.feats.forEach(f => { const s = f.picks?.lore || f.picks?.keen; if (!s) return; if (prof.has(s)) featExp.push(s); else prof.add(s); });
   D.profSkills = ALL_SKILLS.filter(s => prof.has(s));
   picked("expertise").slice(0, D.pools.expertise?.max || 0).forEach(s => prof.has(s) && exp.add(s));
   D.feats.forEach(f => { if (f.name === "Skill Expert" && f.picks?.expert && prof.has(f.picks.expert)) exp.add(f.picks.expert); });
+  featExp.forEach(s => prof.has(s) && exp.add(s));
   // Pool context for expertise options
   if (D.pools.expertise) D.pools.expertise.ctxs = [{ profSkills: D.profSkills }];
 
@@ -543,7 +551,7 @@ function collectFeatures(c, D) {
     const meta = c.featureMeta[key] || {};
     const res = D.resources.find(r => r.feature && norm(r.feature) === norm(extra.base || name));
     const t = meta.text ?? text ?? "";
-    const active = meta.active ?? (!!res || ACTIVE_RX.test(t));
+    const active = meta.active ?? (!!res || ACTIVE_RX.test(t) || /^channel divinity/i.test(name));
     F.push({ key, name, src, text: t, edited: meta.text != null, active, hidden: meta.hidden ?? DEFAULT_HIDDEN.has(name), res, ...extra });
   };
   // species

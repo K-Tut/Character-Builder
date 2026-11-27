@@ -77,6 +77,7 @@ function resChildren(r, D, feats) {
   for (const [cls, names] of Object.entries(RES_BASE_OPTS[r.key] || {})) if (D.cls[cls] || (S.char.extraFeats || []).some(k => k.startsWith(cls + "|"))) names.forEach(n => {
     const f = feats.find(x => norm(x.name) === norm(n)); if (f || D.cls[cls]) add(n, f?.text || lookup(n, [classSlug(cls)].filter(Boolean), CLASS_OPT_DESC[n] || ""), f?.src || CLASSES[cls].name); });
   feats.forEach(f => { if (f.res && f.res !== r) return;
+    if (r.key === "channel" && /^channel divinity\s*:/i.test(f.base || f.name)) return add((f.base || f.name).replace(/^channel divinity\s*:\s*/i, ""), f.text, f.src);
     if ((SPENDS[r.key] || []).some(n => norm(n) === norm(f.base || f.name)) || (SPEND_RX[r.key] && SPEND_RX[r.key].test(f.text || ""))) add(f.base || f.name, f.text, f.src); });
   return out;
 }
@@ -777,7 +778,7 @@ const ACT = {
   }
 };
 // change-type actions (inputs/selects/checkboxes)
-Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT, BUILD_ACT, FS_ACT, GIT_ACT);
+Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT, BUILD_ACT, FS_ACT, GIT_ACT, FT_ACT);
 const CHG = {
   spMode: el => { S.char.spellPoints = el.value === "points"; },
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },

@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-27d";
+const APP_VERSION = "2026-11-27e";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -330,11 +330,23 @@ function featSelect(path, f, cats) {
   const cat = featCatalog();
   const canFilter = cats.some(x => x === "general" || x === "boon");
   const id = path.replace(/[^\w]/g, "_");
-  const all = Object.values(cat).filter(e => cats.includes(e.cat)).filter(e => !canFilter || !flt || f?.name === e.name || (e.abil || []).includes(flt) || (FEATS[e.name]?.asi && flt));
+  const tags = S.ui.featTags || [];
+  const inCats = Object.values(cat).filter(e => cats.includes(e.cat));
+  const all = inCats.filter(e => !canFilter || !flt || f?.name === e.name || (e.abil || []).includes(flt) || (FEATS[e.name]?.asi && flt))
+    .filter(e => !tags.length || f?.name === e.name || featTags(e.name).some(t => tags.includes(t)));
   const open = S.ui.featInfo === id ? S.ui.featInfoName : null;
+  const det = (n, tag) => open === n ? `<div class="infobox" style="width:100%"><div class="desc">${para(featDesc(n)) || '<span class="muted">No description imported.</span>'}</div></div>` : "";
+  const detLink = n => `<a href="#" class="opttog" data-act="featInfoTog" data-id="${id}" data-v="${esc(n)}">${open === n ? "▾ hide" : "▸ details"}</a>`;
+  const tagChips = n => featTags(n).map(t => `<span class="ftag">${esc((FEAT_THEMES.find(x => x[0] === t) || [, t])[1].split(" ")[0])}</span>`).join("");
   let h = `<div class="featpick">`;
-  if (f?.name) h += `<div class="row"><b>Chosen:</b> <span class="chip acc">${esc(f.name)}</span>${path !== "__bg" ? `<a href="#" class="small" data-act="pickFeat" data-p="${esc(path)}" data-v="">clear</a>` : ""}</div>`;
+  if (f?.name) h += `<div class="fprow on fpchosen"><span><b>Chosen:</b> <span class="chip acc">${esc(f.name)}</span>${path !== "__bg" ? ` <a href="#" class="small" data-act="pickFeat" data-p="${esc(path)}" data-v="">clear</a>` : ""}</span>${detLink(f.name)}${det(f.name)}</div>`;
+  // shortlist: feats put aside to compare
+  const short = FeatShort.get().filter(n => inCats.some(e => e.name === n));
+  if (short.length) h += `<div class="fpshort"><div class="small"><b>📋 Your shortlist</b> <span class="muted">— compare, then select one</span></div>${short.map(n => `<div class="fprow ${f?.name === n ? "on" : ""}">
+      <span><b>${esc(n)}</b> ${tagChips(n)}</span><span class="fpbtns">${f?.name === n ? '<span class="chip acc">selected</span>' : `<button class="small" data-act="pickFeat" data-p="${esc(path)}" data-v="${esc(n)}">Select</button>`}<button class="small ghost" data-act="featShort" data-v="${esc(n)}" title="Remove from shortlist">✕</button></span>${detLink(n)}${det(n)}</div>`).join("")}</div>`;
+  h += `<div class="row small fthemes" style="margin:6px 0"><span class="muted">Show feats for:</span>${FEAT_THEMES.map(([k, l]) => `<span class="chip ${tags.includes(k) ? "acc" : ""}" style="cursor:pointer" data-act="featTag" data-t="${k}">${l}</span>`).join("")}${tags.length ? `<a href="#" class="small" data-act="featTag" data-t="">clear</a>` : ""}</div>`;
   if (canFilter) h += `<div class="row small" style="margin:6px 0"><span class="muted">Raises:</span>${["", ...ABILITIES].map(a => `<span class="chip ${flt === a ? "acc" : ""}" style="cursor:pointer" data-act="featFilterChip" data-a="${a}">${a ? ABBR[a] : "Any"}</span>`).join("")}</div>`;
+  if (!all.length) h += `<p class="small muted">No feats match these filters.</p>`;
   h += `<div class="featlist" data-sk="fl-${id}">`;
   for (const c of cats) {
     const inCat = all.filter(e => e.cat === c); if (!inCat.length) continue;
@@ -343,9 +355,9 @@ function featSelect(path, f, cats) {
     for (const src of srcs) {
       h += `<div class="fphead">${esc(FEAT_CATS[c] || c)}${srcs.length > 1 || src !== "Player's Handbook" ? ` <span class="muted">· ${esc(src)}</span>` : ""}</div>`;
       h += bySrc[src].sort((a, b) => a.name.localeCompare(b.name)).map(e => `<div class="fprow ${f?.name === e.name ? "on" : ""}">
-        <label><input type="radio" name="fp_${id}" data-act="pickFeat" data-p="${esc(path)}" data-v="${esc(e.name)}" ${f?.name === e.name ? "checked" : ""}> <b>${esc(e.name)}</b>${e.abil ? ` <span class="small muted">${abilTag(e.abil)}</span>` : ""}${e.prereq ? ` <span class="small muted">· ${esc(e.prereq)}</span>` : ""}</label>
-        <a href="#" class="opttog" data-act="featInfoTog" data-id="${id}" data-v="${esc(e.name)}">${open === e.name ? "▾ hide" : "▸ details"}</a>
-        ${open === e.name ? `<div class="infobox" style="width:100%"><div class="desc">${para(featDesc(e.name)) || '<span class="muted">No description imported.</span>'}</div></div>` : ""}</div>`).join("");
+        <label><input type="radio" name="fp_${id}" data-act="pickFeat" data-p="${esc(path)}" data-v="${esc(e.name)}" ${f?.name === e.name ? "checked" : ""}> <b>${esc(e.name)}</b>${e.abil ? ` <span class="small muted">${abilTag(e.abil)}</span>` : ""}${e.prereq ? ` <span class="small muted">· ${esc(e.prereq)}</span>` : ""} ${tagChips(e.name)}</label>
+        <button class="small ghost fpstar ${FeatShort.get().includes(e.name) ? "on" : ""}" data-act="featShort" data-v="${esc(e.name)}" title="${FeatShort.get().includes(e.name) ? "Remove from shortlist" : "Put into shortlist"}">${FeatShort.get().includes(e.name) ? "★ listed" : "☆ list"}</button>
+        ${detLink(e.name)}${det(e.name)}</div>`).join("");
     }
   }
   return h + `</div></div>`;
@@ -355,6 +367,7 @@ function pickOpts(spec, D) {
   if (spec === "skills") return ALL_SKILLS;
   if (spec === "profSkills") return D.profSkills;
   if (spec === "skillsOrTools") return ALL_SKILLS.concat(TOOLS);
+  if (spec === "artisanTools") return TOOLS.slice(0, 17);
   return [];
 }
 function featPicks(path, f, D) {
