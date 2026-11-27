@@ -257,6 +257,10 @@ const Sync = {
 function renderSyncChip() {
   const el = document.getElementById("syncchip"); if (!el) return;
   const st = Sync.status;
+  if (!Sync.enabled() && st !== "error" && typeof GitSync !== "undefined" && GitSync.enabled()) {
+    const g = GitSync.status, gi = { ok: "⑂✓", syncing: "⑂…", offline: "⑂✕", error: "⑂!" }[g] || "⑂";
+    el.innerHTML = `<button class="ghost small ${g === "error" ? "warnbtn" : ""}" data-act="gitNow" title="${esc(GitSync.msg || g)}">${gi}<span class="synctxt"> ${g === "ok" ? "Synced" : g === "syncing" ? "Syncing" : g === "error" ? "Sync problem" : g === "offline" ? "Offline" : "GitHub"}</span></button>`; return;
+  }
   if (!Sync.enabled() && st !== "error") { el.innerHTML = ""; return; }
   const icon = { ok: "☁✓", syncing: "☁…", signin: "☁!", offline: "☁✕", error: "☁!" }[st] || "☁";
   el.innerHTML = `<button class="ghost small ${st === "signin" || st === "error" ? "warnbtn" : ""}" data-act="syncTap" title="${esc(Sync.msg || st)}">${icon}<span class="synctxt"> ${esc(st === "ok" ? "Synced" : st === "syncing" ? "Syncing" : st === "signin" ? "Reconnect" : st === "offline" ? "Offline" : "Sync error")}</span></button>`;

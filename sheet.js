@@ -777,7 +777,7 @@ const ACT = {
   }
 };
 // change-type actions (inputs/selects/checkboxes)
-Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT, BUILD_ACT, FS_ACT);
+Object.assign(ACT, SPELL_ACT, COMP_ACT, BUFF_ACT, BUILD_ACT, FS_ACT, GIT_ACT);
 const CHG = {
   spMode: el => { S.char.spellPoints = el.value === "points"; },
   xfToggle: el => { const k = el.dataset.k, a = S.char.extraFeats ||= []; if (el.checked) { if (!a.includes(k)) a.push(k); } else S.char.extraFeats = a.filter(x => x !== k); },

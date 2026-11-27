@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-26a";
+const APP_VERSION = "2026-11-27a";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -195,7 +195,7 @@ function renderHome() {
   return `
   <div class="card"><div class="row"><h2 style="margin:0">Your characters</h2><span class="viewtog" title="How to show your characters"><button class="small ${homeMode() === "list" ? "on" : ""}" data-act="homeMode" data-v="list" title="List">☰ List</button><button class="small ${homeMode() === "cards" ? "on" : ""}" data-act="homeMode" data-v="cards" title="Cards">🂠 Cards</button><button class="small ${homeMode() === "tiles" ? "on" : ""}" data-act="homeMode" data-v="tiles" title="Tiles">▦ Tiles</button></span><button class="right" data-act="new">+ New</button><button class="ghost" data-act="importJson">⤒ Import</button><button class="ghost" data-act="exportAll" title="Save all characters in one file (Import reads it back)">⤓ Export all</button><button class="ghost" data-act="groupEdit" data-g="" title="Put characters together in a named group">🗂 New group</button></div></div>
   ${homeMode() === "cards" ? renderCharCards() : homeMode() === "tiles" ? renderCharTiles() : renderCharGroups()}
-  <p class="small muted" style="margin:4px 2px 14px">${S.server ? "Characters are also saved as files in the <b>characters</b> folder on this PC." : "Characters are saved in this app on this device."} To move one to another device: open it → <b>⤓ Export</b>, send the file, then <b>Import</b> it there.</p>
+  <p class="small muted" style="margin:4px 2px 14px">${S.server ? "Characters are also saved as files in the <b>characters</b> folder on this PC." : "Characters are saved in this app on this device."} ${typeof GitSync !== "undefined" && GitSync.enabled() ? "Synced with GitHub (" + esc(GitSync.cfg().repo) + "). " : ""}To move one to another device: open it → <b>⤓ Export</b>, send the file, then <b>Import</b> it there.</p>
 
   <div class="card" style="margin-top:20px">
     <h3>Google Drive sync <span class="chip">optional</span></h3>
@@ -205,6 +205,8 @@ function renderHome() {
       <div class="row"><input id="clientId" placeholder="Google OAuth Client ID (…apps.googleusercontent.com)" value="${esc(st.clientId || window.GOOGLE_CLIENT_ID || "")}" style="flex:1;min-width:240px"><button data-act="syncConnect">Connect Google Drive</button></div>
       ${Sync.status === "error" ? `<p class="warn small">${esc(Sync.msg)}</p>` : ""}`}
   </div>
+
+  ${typeof gitSyncCard === "function" ? gitSyncCard() : ""}
 
   <div class="card">
     <h3>Rules text (wiki data)</h3>
