@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-11-27h";
+const APP_VERSION = "2026-11-28a";
 "use strict";
 /* ============ UI: state, binding, home, builder ============ */
 
@@ -172,7 +172,7 @@ function renderCharTiles() {
   if (!S.chars.length) return `<p class="muted">No characters yet — create one!</p>`;
   return `<div class="ctiles">${sortedByClass().map(c => { const img = c.portrait || c.thumb;
     return `<div class="ctwrap" data-act="open" data-id="${esc(c.id)}" title="${esc(c.name || "")}"><div class="ctile">${img ? `<img src="${img}" alt="" loading="lazy">` : `<div class="ccph">🛡</div>`}
-      <span class="ctcls">${esc(c.cls ? c.cls + (c.multi ? " +" : "") : "—")} · ${c.lvl}</span></div></div>`; }).join("")}</div>`;
+      <span class="ctcls ctname">${esc(c.name || "")}</span><span class="ctcls">${esc(c.cls ? c.cls + (c.multi ? " +" : "") : "—")} · ${c.lvl}</span></div></div>`; }).join("")}</div>`;
 }
 function openGroups() { try { return JSON.parse(localStorage.getItem("openGroups") || "[]"); } catch (e) { return []; } }
 // characters grouped by their "group" name (stored on each character, so it syncs and exports with it)
