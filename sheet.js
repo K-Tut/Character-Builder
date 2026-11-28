@@ -281,7 +281,7 @@ function sheetSpells(c, D) {
   const add = (name, src, always, lvlHint) => { const si = spellInfo(name); const l = si?.level ?? lvlHint ?? "?"; (groups[l] ||= []).push({ name, src, always, si }); };
   D.alwaysSpells.forEach(s => add(s.name, s.src, true));
   c.spells.forEach(s => add(s.name, s.cls === "other" ? "Other" : CLASSES[s.cls]?.name || s.cls, false, s.level));
-  let h = D.casters.map(cs => `<span class="chip acc roll" ${R(cs.name + " spell attack", cs.atk)}>${cs.name}: DC ${cs.dc} · Atk ${sgn(cs.atk)} 🎲</span>`).join("")
+  let h = D.casters.map(cs => `<span class="chip acc roll${D.buffed?.dc ? " buffed" : ""}" ${R(cs.name + " spell attack", cs.atk)}>${cs.name}: DC ${cs.dc} · Atk ${sgn(cs.atk)} 🎲</span>`).join("")
     + (D.speciesCast && D.alwaysSpells.some(s => s.cls === "species") ? `<span class="chip acc roll" ${R(D.speciesCast.name + " spell attack", D.speciesCast.atk)}>${esc(D.speciesCast.name)} spells: DC ${D.speciesCast.dc} · Atk ${sgn(D.speciesCast.atk)} (${ABBR[D.speciesCast.ability]}) 🎲</span>` : "") + `<button class="small ghost" data-act="goSpells" style="margin-left:6px">Change spells</button>`;
   h += (D.featCasters || []).map(fc => `<span class="chip acc roll" ${R(fc.name + " spell attack", fc.atk)}>${esc(fc.name)}: DC ${fc.dc} · Atk ${sgn(fc.atk)} (${ABBR[fc.ability]}) 🎲</span>`).join("");
   if (D.slots.length || D.pact || D.spellPoints) h += `<div class="spslots"><h3 style="margin:10px 0 4px">${D.spellPoints ? "Spell points" : "Spell slots"}</h3>${slotRows(D, c.play)}</div>`;
@@ -606,8 +606,9 @@ const ACT = {
   xfRemove: (el, e) => { e.preventDefault(); S.char.extraFeats = (S.char.extraFeats || []).filter(k => k !== el.dataset.k); save(); render(); },
   toggleOldSubs: (el, e) => { e.preventDefault(); S.ui.oldSubs = !S.ui.oldSubs; renderModal(); },
   useForm: el => { const c = S.char, r = derive(c).resources.find(x => x.key === el.dataset.k); if (!r) return; const used = c.play.used[r.key] || 0;
-    if (used >= r.max) return toast("No uses left — finish a Long Rest"); c.play.used[r.key] = used + 1; (c.play.active ||= {})[r.key] = el.dataset.f; save(); render(); toast(el.dataset.f + " — active for 1 minute"); },
-  endForm: el => { const c = S.char; if (c.play.active) delete c.play.active[el.dataset.k]; save(); render(); },
+    if (used >= r.max) return toast("No uses left — finish a Long Rest"); c.play.used[r.key] = used + 1; (c.play.active ||= {})[r.key] = el.dataset.f;
+    if (typeof featureBuff === "function" && buffInfo(el.dataset.f)) featureBuff(c, el.dataset.f, r.key); save(); render(); toast(el.dataset.f + " — active for 1 minute"); },
+  endForm: el => { const c = S.char; if (c.play.active) delete c.play.active[el.dataset.k]; c.play.buffs = (c.play.buffs || []).filter(b => b.res !== el.dataset.k); save(); render(); },
   setBg: el => { const c = S.char; if (c.background.id !== el.dataset.id) { applyStartEquip(c, [], "bg"); (c.startEquip ||= {}).bg = ""; c.background = { id: el.dataset.id, mode: "21", plus2: "", plus1: "", tool: "", skills: [], p111: [] }; c.bgFeat = { picks: {} }; } save(); render(); },
   pbm: el => { const a = el.dataset.a; S.char.base[a] = Math.max(8, Math.min(15, S.char.base[a] + +el.dataset.d)); save(); render(); },
   stdArray: () => { const D = derive(S.char); const order = [...ABILITIES].sort((a, b) => (D.startCls && CLASSES[D.startCls].primary.includes(b) ? 1 : 0) - (D.startCls && CLASSES[D.startCls].primary.includes(a) ? 1 : 0)); [15, 14, 13, 12, 10, 8].forEach((v, i) => S.char.base[order[i]] = v); save(); render(); },
@@ -628,7 +629,8 @@ const ACT = {
     openModal({ type: "info", title: k.name, sub: [k.src, "uses " + r.name].filter(Boolean).join(" · "), html: k.text ? diceLinks(para(k.text), k.name) : '<span class="muted">No description imported.</span>' }); },
   resInfo: el => { const D = derive(S.char), r = D.resources.find(x => x.key === el.dataset.k); if (!r) return;
     const f = D.features.find(x => norm(x.name) === norm(r.feature) || norm(x.name).startsWith(norm(r.feature) + " ") || norm(x.name).startsWith(norm(r.feature) + ":"));
-    const txt = stripOptions(f?.text || lookup(r.feature || r.name), resChildren(r, D, D.features));
+    let txt = stripOptions(f?.text || lookup(r.feature || r.name), resChildren(r, D, D.features));
+    (r.forms || []).forEach(fm => { if (!new RegExp("(^|\\n)\\s*" + fm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i").test(txt || "")) { const B = typeof buffInfo === "function" && buffInfo(fm); if (B?.note) txt = (txt || "") + "\n" + fm + ". " + B.note + " (summary)"; } });
     openModal({ type: "info", title: r.name, sub: [f?.src || r.src, r.reset === "SR" ? "recharges on a Short rest" : r.reset === "LR" ? "recharges on a Long rest" : "", r.die ? "die: " + r.die : ""].filter(Boolean).join(" · "), html: txt ? diceLinks(para(txt), r.name) : '<span class="muted">No description imported.</span>' }); },
   mastInfo: el => { const o = S.ui.mastOpen ||= {}; o[el.dataset.i] = !o[el.dataset.i]; render(); },
   spSchool: el => { const v = el.dataset.v, a = S.ui.spSchools || []; S.ui.spSchools = !v ? [] : a.includes(v) ? a.filter(x => x !== v) : [...a, v]; render(); },
@@ -655,7 +657,10 @@ const ACT = {
     const k = el.dataset.k, i = +el.dataset.i, m = +el.dataset.m, P = S.char.play;
     const store = k.startsWith("slot_") ? [P.slots, k.slice(5)] : k === "pact" ? [P, "pact"] : k.startsWith("hd_") ? [P.hd, k.slice(3)] : [P.used, k];
     const rem = m - (store[0][store[1]] || 0); const nrem = i < rem ? rem - 1 : rem + 1;
-    store[0][store[1]] = m - nrem; save(); render();
+    store[0][store[1]] = m - nrem;
+    const RES_BUFF = { innate: "Innate Sorcery" };   // spending one of these switches the effect on (banner + numbers)
+    if (nrem < rem && RES_BUFF[k] && typeof featureBuff === "function") { featureBuff(S.char, RES_BUFF[k], k); toast(RES_BUFF[k] + " — active for 1 minute"); }
+    save(); render();
   },
   spCast: el => { const c = S.char, D = derive(c), L = +el.dataset.l, cost = SPELL_POINT_COST[L], P = c.play;
     if ((D.spellPoints.max - (+P.used.spellpoints || 0)) < cost) return toast("Not enough spell points");

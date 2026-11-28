@@ -45,6 +45,18 @@ const BUFFS = {
   "Pass without Trace": { min: 60, conc: true, note: "+10 to Dexterity (Stealth) checks" },
   "Protection from Energy": { min: 60, conc: true, modes: { Acid: {}, Cold: {}, Fire: {}, Lightning: {}, Thunder: {} }, note: "Resistance to the chosen damage type" }
 };
+// features you switch on (not spells): Innate Sorcery, Aasimar Celestial Revelation …  feature: true = no slot, ends with ✕ / rests
+Object.assign(BUFFS, {
+  "Innate Sorcery": { min: 1, feature: true, icon: "🔮", fx: { spellDC: 1, spellAdv: true }, note: "Spell save DC +1 · Advantage on spell attack rolls (Sorcerer spells)" },
+  "Heavenly Wings": { min: 1, feature: true, icon: "🪽", fx: { pbDmg: "radiant", fly: true }, note: "Fly Speed equal to your Speed · once per turn +PB Radiant damage to one target you hit" },
+  "Inner Radiance": { min: 1, feature: true, icon: "☀️", fx: { pbDmg: "radiant" }, note: "Bright light 10 ft; at the end of each of your turns, creatures within 10 ft take Radiant damage = PB · once per turn +PB Radiant damage" },
+  "Necrotic Shroud": { min: 1, feature: true, icon: "💀", fx: { pbDmg: "necrotic" }, note: "Creatures within 10 ft (not allies) make a Cha save or are Frightened of you until the end of your next turn · once per turn +PB Necrotic damage" }
+});
+// switch a feature buff on (called when you spend Innate Sorcery or pick a Celestial Revelation form)
+function featureBuff(c, name, resKey) {
+  const P = c.play; P.buffs = (P.buffs || []).filter(b => !(b.res && b.res === resKey));
+  P.buffs.push({ id: "b" + Date.now().toString(36), spell: name, target: "self", lvl: 1, at: Date.now(), res: resKey });
+}
 const buffInfo = name => BUFFS[name] || BUFFS[Object.keys(BUFFS).find(k => norm(k) === norm(name))];
 function buffFx(b) { const B = buffInfo(b.spell); if (!B) return {}; const m = B.modes?.[b.mode] || {}; return { ...(B.fx || {}), ...(m.fx || {}) }; }
 function buffNote(b) { const B = buffInfo(b.spell); return (B?.modes?.[b.mode]?.note) || B?.note || ""; }
@@ -63,7 +75,11 @@ function applyBuffsSelf(c, D) {
     if (f.speedMul) { D.speed *= f.speedMul; mark("speed", b.spell); }
     if (f.hpMax) { D.hpMax += f.hpMax(L); mark("hp", b.spell); }
     if (f.hit) { const h = typeof f.hit === "function" ? f.hit(L) : f.hit; D.attacks.forEach(a => { a.hit += h; a.buffHit = (a.buffHit || []).concat(b.spell); }); mark("hit", b.spell); }
-    if (f.dmg || f.dmgFlat) mark("dmg", b.spell);
+    if (f.dmg || f.dmgFlat || f.pbDmg) mark("dmg", b.spell);
+    if (f.spellDC) { const up = x => { if (x) x.dc += f.spellDC; }; (D.casters || []).forEach(up); (D.featCasters || []).forEach(up); up(D.speciesCast);
+      (D.spellAttacks || []).forEach(a => { if (a.mode === "save" && typeof a.dc === "number") a.dc += f.spellDC; }); mark("dc", b.spell); }
+    if (f.spellAdv) { D.spellAdv = (D.spellAdv || []).concat(b.spell); mark("spellatk", b.spell); }
+    if (f.fly) { D.flyNote = b.spell; mark("speed", b.spell); }
   }
 }
 // changes on a companion's stat block
@@ -89,7 +105,8 @@ function applyBuffsComp(c, key, s) {
 // damage riders from your own active spells (added to weapon damage rolls, pre-selected)
 function buffRiders(c, D, a, out) {
   for (const b of buffsOn(c, "self")) {
-    const f = buffFx(b), d = f.dmg; if (!d && !f.dmgFlat) continue;
+    const f = buffFx(b), d = f.dmg; if (!d && !f.dmgFlat && !f.pbDmg) continue;
+    if (f.pbDmg) { if (!out.some(r => r.name === b.spell)) out.push({ name: b.spell, flat: D.pb, type: f.pbDmg, note: "once per turn", auto: true }); continue; }
     if (a.kind !== "weapon" && !d?.any) continue;
     const ex = out.find(r => norm(r.name) === norm(b.spell)); if (ex) { ex.auto = true; ex.spell = false; continue; }
     if (d) out.push({ name: b.spell, n: d.n, s: d.s, sign: d.sign || 1, type: d.type === "mode" ? norm(b.mode) : d.type || a.dtype || "", note: "active spell", auto: true });
@@ -111,9 +128,9 @@ function buffD20(c, title) {
 function buffBanner(c, target) {
   const list = buffsOn(c, target); if (!list.length) return "";
   return `<div class="buffbar">${list.map(b => { const B = buffInfo(b.spell);
-    return `<div class="buff"><span class="bicon">✨</span><div class="grow"><b>${esc(b.spell)}${b.mode ? " (" + esc(b.mode) + ")" : ""}</b>${b.lvl > 1 ? ` <span class="small muted">level ${b.lvl}</span>` : ""}
-      <div class="small">${esc(buffNote(b))}</div><div class="small muted">lasts ${esc(buffDur(B))}${B.conc ? " · Concentration" : ""}${b.at ? " · cast " + new Date(b.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</div></div>
-      <button class="small ghost" data-act="buffEnd" data-id="${b.id}" title="End the spell">✕ End</button></div>`; }).join("")}</div>`;
+    return `<div class="buff"><span class="bicon">${B.icon || "✨"}</span><div class="grow"><b>${esc(b.spell)}${b.mode ? " (" + esc(b.mode) + ")" : ""}</b>${b.lvl > 1 ? ` <span class="small muted">level ${b.lvl}</span>` : ""}
+      <div class="small">${esc(buffNote(b))}</div><div class="small muted">lasts ${esc(buffDur(B))}${B.conc ? " · Concentration" : ""}${b.at ? (B.feature ? " · since " : " · cast ") + new Date(b.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</div></div>
+      <button class="small ghost" data-act="buffEnd" data-id="${b.id}" title="End it">✕ End</button></div>`; }).join("")}</div>`;
 }
 const glowIf = (arr) => arr && arr.length ? ` buffed" title="${esc(arr.join(", "))}` : "";
 
@@ -163,7 +180,7 @@ const BUFF_ACT = {
     closeModal(); save(); render(); toast(`${M.spell} cast on ${M.target === "self" ? "yourself" : companionList(c, D).find(x => x.key === M.target)?.name || "companion"}`);
   },
   buffEnd: el => { const c = S.char, P = c.play, b = (P.buffs || []).find(x => x.id === el.dataset.id); if (!b) return;
-    P.buffs = P.buffs.filter(x => x !== b); const B = buffInfo(b.spell), fx = buffFx(b);
+    P.buffs = P.buffs.filter(x => x !== b); const B = buffInfo(b.spell), fx = buffFx(b); if (b.res && P.active) delete P.active[b.res];
     if (B?.conc && !P.buffs.some(x => buffInfo(x.spell)?.conc)) P.conditions = P.conditions.filter(x => x !== "Concentrating");
     if (fx.cond) { if (b.target === "self") P.conditions = P.conditions.filter(x => x !== fx.cond); else { const st = c.comps?.[b.target] || (c.ownComps || []).find(o => "own:" + o.id === b.target); if (st?.cond) st.cond = st.cond.filter(x => x !== fx.cond); } }
     if (fx.hpMax && b.target === "self") { const D = derive(c); P.hp = Math.min(P.hp ?? D.hpMax, D.hpMax); }
